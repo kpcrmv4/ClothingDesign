@@ -1,155 +1,169 @@
-# Baby Fashion Engine - แผนพัฒนา MCP Server
+# Baby Fashion Engine — Master Plan
 
 ## ภาพรวมโปรเจกต์
 
-MCP Server สำหรับสร้างแพทเทิร์นเสื้อผ้าเด็กเล็ก (0-24 เดือน) ออกมาเป็น PDF
-ที่แบ่งเป็นหน้า A4 ต่อกันได้ พร้อมเครื่องหมายช่วยเย็บแบบมืออาชีพ
+MCP server สำหรับสร้างแพทเทิร์นเสื้อผ้าเด็กเล็ก (0-24 เดือน) ครบวงจร
+ตั้งแต่ออกแบบจากข้อความ/รูปภาพ → generate PDF แบบตัด A4 ต่อกันได้
+→ แนะนำวัสดุ/ผ้า → ให้ preview ก่อนพิมพ์จริง
 
-### เป้าหมายหลัก
-- รองรับแพทเทิร์นหลายประเภท (ไม่ใช่แค่เดรส)
-- ใช้เส้นโค้ง bezier แทนเส้นตรงล้วนเพื่อให้แพทเทิร์นเหมือนของจริง
-- มีเครื่องหมาย notch, grain line, fold edge, registration grid
-- คำนวณปริมาณผ้าที่ต้องใช้ให้ได้
-- ให้คำแนะนำการเย็บเบื้องต้น
+### เป้าหมาย
+- แพทเทิร์นครอบคลุมตู้เสื้อผ้าเด็ก: เดรส, กางเกง, เสื้อยืด, ชุดหมี, ชุดนอน, หมวก, ผ้ากันเปื้อน
+- ใช้ Claude วิเคราะห์รูป/ข้อความแล้วเลือก pattern + params ให้อัตโนมัติ
+- แสดง preview PNG ก่อน generate PDF จริง
+- ผลลัพธ์ระดับมืออาชีพ: bezier curves, notches, grain, fold, pattern symbols
+- ให้ shopping list วัสดุ + cutting layout บนผ้ากว้างจริง
 
-### หน่วยและมาตรฐาน
-- ใช้ cm ตลอดทั้งไฟล์
-- พิกัด (0, 0) อยู่มุมล่างซ้ายของ virtual canvas (ตาม reportlab)
-- seam allowance ค่าเริ่มต้น 1.0 cm (ปรับต่อขอบได้)
+### หน่วย / มาตรฐาน
+- ทุกอย่างเป็น cm
+- พิกัด (0, 0) มุมล่างซ้ายของ virtual canvas
+- SA เริ่มต้น 1.0 cm (ปรับต่อ tool ได้)
+- A4 printable area: 19 x 27.7 cm (margin 1 cm รอบ)
 
 ---
 
-## โครงสร้างไฟล์ baby_pattern_server.py
+## โครงสร้างไฟล์ (เป้าหมาย)
 
 ```
-1. Module docstring + imports
-2. SIZE_CHART (ขยายจาก 4 เป็น 6 ไซส์ เพิ่มฟิลด์วัดตัว)
-3. ค่าคงที่หน้ากระดาษ (PRINTABLE_W_CM, PRINTABLE_H_CM)
-4. Drawing utilities (ฟังก์ชันช่วยวาด):
-   - _grid_ref()                แปลง col,row เป็น A1/A2/B1
-   - draw_grain_line()          ลูกศรแนวเส้นด้าย
-   - draw_notch()                ขีด V ที่ขอบชิ้น
-   - draw_fold_edge()           เส้น chain-dot สำหรับตัดบนผ้าพับ
-   - draw_bezier_edge()         เส้นโค้งสำหรับวงคอ วงแขน
-   - draw_piece_rect()          สี่เหลี่ยมพร้อม SA ต่อขอบ
-   - draw_calibration()         จัตุรัส 5x5 + bar วัด 10 cm
-   - draw_page_header()         หัวกระดาษบอกชื่อแพทเทิร์น + grid ref
-   - draw_registration_marks()  เครื่องหมายเล็ง 4 มุม
-   - tile_and_save()            ฟังก์ชันหลัก tile virtual canvas ลง A4 หลายหน้า
-5. Fabric calculator
-   - calculate_yardage()        รับ bbox -> คืนเมตรผ้าที่ต้องใช้ 3 ความกว้าง
-6. @mcp.tool() ต่าง ๆ
-7. if __name__ == "__main__": mcp.run()
+clothingdesign/
+├── baby_pattern_server.py     # entry: FastMCP + @mcp.tool() รวมศูนย์
+├── requirements.txt
+├── .gitignore
+├── CLAUDE.md
+├── sizes.py                   # SIZE_CHART + helpers
+├── constants.py               # page geometry, default SA
+├── drawing.py                 # primitives: grain, notch, fold, bezier, tiling
+├── symbols.py                 # dart, pleat, gather, buttonhole, pocket
+├── preview.py                 # PNG thumbnail (Pillow)
+├── features.py                # shopping list, cutting layout, customize, difficulty metadata
+└── patterns/
+    ├── __init__.py
+    ├── dress.py
+    ├── bib.py
+    ├── bloomers.py
+    ├── bonnet.py
+    ├── kimono_top.py          # เสื้อป้ายผูกข้าง
+    ├── pants.py               # กางเกงขายาว/ขาสั้น เอวยางยืด
+    ├── tshirt.py              # เสื้อยืดคอกลม
+    ├── romper.py              # ชุดหมี เสื้อ+กางเกงเป็นชิ้นเดียว
+    └── sleep_sack.py          # ถุงนอนซิป
 ```
 
----
-
-## SIZE_CHART ที่จะใช้ (ขยายจากต้นฉบับ)
-
-| ฟิลด์ | ความหมาย |
-|------|---------|
-| chest | รอบอก |
-| length | ความยาวตัวเสื้อ (ไหล่ถึงชายเสื้อ) |
-| waist | รอบเอว |
-| hip | รอบสะโพก |
-| back_w | ความกว้างหลัง (ไหล่ถึงไหล่) |
-| shoulder | ความยาวบ่า (คอถึงปลายไหล่) |
-| neck_circ | รอบคอ |
-| arm_len | ความยาวแขน (ไหล่ถึงข้อมือ) |
-| rise_f | ระยะหน้าเป้า (เอวหน้าถึงก้น) |
-| rise_b | ระยะหลังเป้า |
-| head | รอบศีรษะ |
-| strap_len | ความยาวสาย |
-| ruffle_h | ความสูงระบาย |
-
-**ไซส์:** 0-3m, 3-6m, 6-9m, 9-12m, 12-18m, 18-24m
+หมายเหตุ: ใช้ flat-ish structure ไม่ต้องลึกเกินไป ง่ายต่อการนำทาง
 
 ---
 
-## Tool ที่จะเขียน
+## SIZE_CHART
 
-| # | ชื่อ tool | ส่วนประกอบหลัก | ใช้เส้นโค้ง? |
-|---|---------|--------------|-------------|
-| 1 | `generate_full_dress_pattern` | ตัวเสื้อ + สาย + ระบาย | ใช่ (วงคอ วงแขน) |
-| 2 | `generate_bloomers_pattern` | กางเกงใน 1 ชิ้นพับ | ใช่ (เป้าโค้ง) |
-| 3 | `generate_bib_pattern` | ผ้ากันเปื้อน | ใช่ (keyhole คอ) |
-| 4 | `generate_bonnet_pattern` | หมวกคลุมผม: crown + brim + tie | ใช่ (โค้งมาก) |
-| 5 | `calculate_fabric_requirement` | คำนวณผ้าต่อ pattern | - |
-| 6 | `list_available_sizes` | คืน SIZE_CHART เป็น JSON-like | - |
+ไซส์: `0-3m`, `3-6m`, `6-9m`, `9-12m`, `12-18m`, `18-24m`
 
-### ข้อตกลงทั่วไปของ tool แต่ละตัว
+ฟิลด์: `chest`, `length`, `waist`, `hip`, `back_w`, `shoulder`, `neck_circ`,
+`arm_len`, `rise_f`, `rise_b`, `head`, `strap_len`, `ruffle_h`
 
-แต่ละ pattern tool รับพารามิเตอร์:
-- `size_label: str` - เลือกจาก SIZE_CHART
-- `seam_allowance: float = 1.0` - SA ค่าเริ่มต้น
-- `include_instructions: bool = True` - แนบหน้าคำแนะนำเย็บ
+---
 
-และคืน string: สถานะ + path ของไฟล์ PDF + จำนวนหน้า
+## Tool ที่จะมีทั้งหมด
+
+### Pattern generators (9 ตัว)
+| # | Tool | Description |
+|---|------|-------------|
+| 1 | `generate_full_dress_pattern` | เดรสไม่มีแขน สาย + ระบาย |
+| 2 | `generate_bib_pattern` | ผ้ากันเปื้อน keyhole |
+| 3 | `generate_bloomers_pattern` | กางเกงใน/คลุมผ้าอ้อม เป้าโค้ง |
+| 4 | `generate_bonnet_pattern` | หมวกคลุมผม 3 ชิ้น |
+| 5 | `generate_kimono_top_pattern` | เสื้อป้ายผูกข้าง ไม่มีกระดุม |
+| 6 | `generate_pants_pattern` | กางเกงเอวยางยืด ขายาว/ขาสั้น |
+| 7 | `generate_tshirt_pattern` | เสื้อยืดแขนสั้น คอกลม |
+| 8 | `generate_romper_pattern` | ชุดหมี เสื้อ+กางเกง |
+| 9 | `generate_sleep_sack_pattern` | ถุงนอนซิป |
+
+### Support tools (7 ตัว)
+| # | Tool | Description |
+|---|------|-------------|
+| 10 | `list_available_sizes` | ดูไซส์ทั้งหมดพร้อมสัดส่วน |
+| 11 | `list_all_patterns` | ลิสต์แพทเทิร์นพร้อม difficulty, time, fabric suggestion |
+| 12 | `calculate_fabric_requirement` | คำนวณเมตรผ้า 3 ความกว้าง |
+| 13 | `generate_shopping_list` | รายการวัสดุครบ: ผ้า, ด้าย, ยางยืด, กระดุม, ฯลฯ |
+| 14 | `generate_cutting_layout` | PNG แสดงผังวางชิ้นบนผ้ากว้างจริง |
+| 15 | `generate_pattern_preview` | PNG thumbnail ของแพทเทิร์นก่อน generate PDF |
+| 16 | `suggest_pattern_from_description` | รับบรรยาย/คำอธิบายรูป → แนะนำ tool + params |
 
 ---
 
 ## แผนการพัฒนาเป็นเฟส
 
-### Phase 1: Foundation (จำเป็นก่อน)
-- [ ] Module docstring, imports, mcp init
-- [ ] SIZE_CHART ขยาย 6 ไซส์
-- [ ] ค่าคงที่หน้ากระดาษ + `_grid_ref()`
+### Phase A — Restructure + Metadata + Shopping (ฐาน)
+- [ ] แตกไฟล์เดิมเป็นโมดูล (`sizes.py`, `constants.py`, `drawing.py`, `patterns/`)
+- [ ] สร้าง `PATTERN_META` dict: difficulty, estimated_time, fabric_types
+- [ ] เพิ่ม tool `list_all_patterns`
+- [ ] เพิ่ม tool `generate_shopping_list` พร้อมข้อมูลวัสดุต่อแพทเทิร์น
+- [ ] Smoke test + commit
 
-### Phase 2: Drawing primitives
-- [ ] `draw_grain_line()`
-- [ ] `draw_notch()`
-- [ ] `draw_fold_edge()`
-- [ ] `draw_bezier_edge()`
-- [ ] `draw_calibration()`
-- [ ] `draw_page_header()`
-- [ ] `draw_registration_marks()`
+### Phase B — แพทเทิร์นใหม่ 5 ตัว
+- [ ] B1: `kimono_top.py` + tool
+- [ ] B2: `pants.py` + tool (รองรับทั้งขายาว/ขาสั้นผ่าน param)
+- [ ] B3: `tshirt.py` + tool
+- [ ] B4: `romper.py` + tool
+- [ ] B5: `sleep_sack.py` + tool
+- [ ] Smoke test ทุกตัว + commit
 
-### Phase 3: High-level tiling
-- [ ] `tile_and_save()` — รับ draw_callback, ขนาด canvas, path -> ออก PDF
-- [ ] `draw_instruction_page()` — หน้าแนะนำการเย็บ
+### Phase C — Visual features
+- [ ] C1: `symbols.py` — dart, pleat, gather marks, buttonhole, pocket placement
+- [ ] C2: `preview.py` — PNG preview ใช้ Pillow (แยกจาก PDF rendering)
+- [ ] C3: เพิ่ม tool `generate_pattern_preview`
+- [ ] C4: `features.py:generate_cutting_layout` — PNG ผังวางบนผ้า 115/150 cm
+- [ ] Smoke test + commit
 
-### Phase 4: Tool แพทเทิร์น (1 ตัวต่อสเต็ป)
-- [ ] 4a: `generate_full_dress_pattern` (ปรับปรุงของเดิม)
-- [ ] 4b: `generate_bib_pattern` (ง่ายสุด เริ่มตรงนี้ได้)
-- [ ] 4c: `generate_bloomers_pattern`
-- [ ] 4d: `generate_bonnet_pattern`
+### Phase D — Smart features
+- [ ] D1: `features.py:customize_pattern` — รับ changes dict แปลงเป็น param override
+- [ ] D2: tool `suggest_pattern_from_description` — Claude ใช้ตีความรูป/ข้อความ
+- [ ] D3: ปรับ docstring ของทุก pattern tool ให้ Claude เลือกใช้ถูก
+- [ ] Test กับบรรยายจริง + commit
 
-### Phase 5: Tool สนับสนุน
-- [ ] `calculate_fabric_requirement`
-- [ ] `list_available_sizes`
-
-### Phase 6: ทดสอบ + commit
-- [ ] รัน smoke test (import + เรียก 1 tool)
-- [ ] Commit แยกเฟส หรือ commit ใหญ่ก้อนเดียว
-- [ ] Push branch `claude/baby-dress-pattern-ZUGM7`
-
----
-
-## หลักการออกแบบที่จะยึด
-
-1. **Virtual canvas ก่อน แล้วค่อย tile** — เขียนโค้ดวาดใน canvas ใหญ่ (หน่วย cm) แล้วให้ `tile_and_save()` ตัดเป็นหน้า A4 เอง ไม่ต้องคำนวณ offset ของแต่ละหน้าในโค้ดแต่ละ tool
-2. **แต่ละ piece เป็น callback** — tool ส่ง `draw_fn(c)` เข้า `tile_and_save()` แทนการคำนวณ row/col เอง
-3. **ไม่ over-abstract** — ไม่สร้าง dataclass `Piece` เต็มรูปแบบ เพราะ reportlab API ทำงานแบบ imperative อยู่แล้ว
-4. **Fail กลับเป็น error string** — เพื่อให้ผู้ใช้เห็นข้อความใน Claude Desktop เมื่อใส่ไซส์ผิด
-5. **ใช้ bezier curve 4-จุด** — reportlab มี `c.bezier(x1,y1,x2,y2,x3,y3,x4,y4)` พอสำหรับวงคอ/วงแขน
+### Phase E — Final polish
+- [ ] Update README-style docstring ใน `baby_pattern_server.py`
+- [ ] Push branch สุดท้าย
 
 ---
 
-## สิ่งที่จะ *ไม่* ทำในรอบนี้
+## หลักการออกแบบที่ยึด
 
-- Multi-size nested patterns (เลือกไซส์ได้ในไฟล์เดียว)
-- Bin-packing จัดวางชิ้นส่วนให้กินหน้ากระดาษน้อยสุด — จัดวางแนวตั้งธรรมดาไปก่อน
-- Export SVG/DXF
-- ความซับซ้อนระดับมืออาชีพ (dart, pleat calculator)
-- Image-to-pattern (รับรูปแล้วออกแพทเทิร์น)
-- Romper, Sleep sack, Pinafore — เก็บไว้เฟสถัดไป
+1. **Virtual canvas ก่อน แล้ว tile** — วาดใน cm coordinate แล้ว `tile_and_save()` จัดการ A4
+2. **แต่ละ pattern = draw_fn(canvas)** callback — ไม่ต้องคำนวณหน้ากันเอง
+3. **Preview = Pillow, PDF = reportlab** — คนละ renderer แต่ share geometry calculation
+4. **ไม่ over-abstract** — ไม่สร้าง Piece dataclass ที่บังคับใช้ทุกที่ เอาแค่ dict/tuple ก็พอ
+5. **Fail → error string** — ผู้ใช้เห็นใน Claude Desktop ได้ชัด
+6. **เลี่ยง dependency หนัก** — ใช้ Pillow (มากับ reportlab) แทน cairosvg/poppler
 
 ---
 
-## หมายเหตุสำหรับ Claude เซสชันถัดไป
+## สิ่งที่ *ไม่* ทำในรอบนี้
+
+- Multi-size nested PDF (เลือกไซส์ได้ไฟล์เดียว)
+- Bin-packing แพทเทิร์นแบบแม่นยำ (วางแนวตั้งก็พอ)
+- Proper seam allowance offset บนโค้ง (ใช้ bounding box ง่าย ๆ ก่อน)
+- DXF/SVG export สำหรับเครื่องตัดดิจิทัล
+- Fabric shrinkage compensation
+- Pattern versioning/history (ใช้ git)
+- Custom measurements per child (Phase ถัดไป)
+
+---
+
+## Dependencies
+
+```
+mcp>=1.0
+reportlab>=4.0
+Pillow>=10.0    # PNG preview + cutting layout
+```
+
+Pillow มากับ reportlab อยู่แล้ว ไม่ต้องติดตั้งเพิ่ม
+
+---
+
+## หมายเหตุสำหรับเซสชันถัดไป
 
 - Branch: `claude/baby-dress-pattern-ZUGM7`
-- ไฟล์หลัก: `baby_pattern_server.py`
-- ต้องติดตั้ง `pip install mcp reportlab` ก่อนใช้งาน
-- สคริปต์นี้ต้อง register ใน `claude_desktop_config.json` ถึงจะเรียกผ่าน Claude Desktop ได้
-- PDF output จะถูกเขียนไว้ที่ current working directory ของ server
+- Entry: `baby_pattern_server.py`
+- รัน: `python baby_pattern_server.py` (ต้อง cd เข้ามาในโฟลเดอร์ ไม่งั้น import error)
+- PDF/PNG output ไปที่ `cwd` ของ server (ผู้ใช้ตั้งใน `claude_desktop_config.json`)
+- การเพิ่ม pattern ใหม่: สร้างไฟล์ใน `patterns/` + เพิ่ม `PATTERN_META` + `@mcp.tool()` ที่ `baby_pattern_server.py`
