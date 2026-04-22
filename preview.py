@@ -1,0 +1,293 @@
+"""
+PNG thumbnail preview of patterns (uses Pillow).
+
+Lightweight renderer that reproduces pattern outlines in simple form
+for quick visual check before generating full PDF.
+"""
+import os
+import math
+from PIL import Image, ImageDraw, ImageFont
+
+from sizes import get_size
+
+
+_PX_PER_CM = 10     # 10 pixels per cm = reasonable thumbnail
+_PAD_CM = 2.0
+
+
+def _mm_to_px(val_cm):
+    return int(val_cm * _PX_PER_CM)
+
+
+def _setup_canvas(width_cm, height_cm):
+    """Create a white canvas and return (img, draw, transform_fn)."""
+    w_px = _mm_to_px(width_cm + _PAD_CM * 2)
+    h_px = _mm_to_px(height_cm + _PAD_CM * 2)
+    img = Image.new("RGB", (w_px, h_px), "white")
+    draw = ImageDraw.Draw(img)
+
+    def tx(x_cm, y_cm):
+        """cm coords -> PIL pixel coords (y flipped)."""
+        px = _mm_to_px(x_cm + _PAD_CM)
+        py = h_px - _mm_to_px(y_cm + _PAD_CM)
+        return px, py
+
+    return img, draw, tx
+
+
+def _bezier_points(p0, p1, p2, p3, steps=30):
+    """Sample points along a cubic bezier."""
+    pts = []
+    for i in range(steps + 1):
+        t = i / steps
+        u = 1 - t
+        x = u**3 * p0[0] + 3 * u**2 * t * p1[0] + \
+            3 * u * t**2 * p2[0] + t**3 * p3[0]
+        y = u**3 * p0[1] + 3 * u**2 * t * p1[1] + \
+            3 * u * t**2 * p2[1] + t**3 * p3[1]
+        pts.append((x, y))
+    return pts
+
+
+def _draw_bezier_pil(draw, tx, p0, p1, p2, p3, color="black", width=2):
+    pts = _bezier_points(p0, p1, p2, p3)
+    tx_pts = [tx(*p) for p in pts]
+    for i in range(len(tx_pts) - 1):
+        draw.line([tx_pts[i], tx_pts[i + 1]], fill=color, width=width)
+
+
+def _draw_line_pil(draw, tx, x1, y1, x2, y2, color="black", width=2, dashed=False):
+    if not dashed:
+        draw.line([tx(x1, y1), tx(x2, y2)], fill=color, width=width)
+        return
+    # simple dash
+    dx = x2 - x1
+    dy = y2 - y1
+    dist = math.hypot(dx, dy)
+    if dist == 0:
+        return
+    segs = max(4, int(dist / 0.4))
+    for i in range(0, segs, 2):
+        t1 = i / segs
+        t2 = min(1.0, (i + 1) / segs)
+        draw.line(
+            [tx(x1 + dx * t1, y1 + dy * t1),
+             tx(x1 + dx * t2, y1 + dy * t2)],
+            fill=color, width=width)
+
+
+def _get_font(size=14):
+    try:
+        return ImageFont.truetype("DejaVuSans.ttf", size)
+    except Exception:
+        return ImageFont.load_default()
+
+
+# ============================================================
+# PER-PATTERN PREVIEW RENDERERS
+# ============================================================
+def _preview_dress(spec):
+    bw = spec["chest"] / 4 + 2.0
+    bh = spec["length"]
+    nw = spec["neck_circ"] / 6
+    nd = 3.0
+    ad = 5.5
+    sw = spec["shoulder"]
+
+    total_w = bw + 2
+    total_h = bh + 2
+    img, draw, tx = _setup_canvas(total_w, total_h)
+    font = _get_font(14)
+    label_font = _get_font(10)
+
+    x, y = 1.0, 1.0
+    # bodice outline (half piece, left edge = fold)
+    _draw_line_pil(draw, tx, x, y, x + bw, y)              # hem
+    _draw_line_pil(draw, tx, x + bw, y, x + bw, y + bh - ad)   # side
+    _draw_bezier_pil(draw, tx,
+                     (x + bw, y + bh - ad),
+                     (x + bw - 1, y + bh - ad * 0.5),
+                     (x + bw - 2, y + bh),
+                     (x + nw + sw, y + bh))                # armhole
+    _draw_line_pil(draw, tx, x + nw + sw, y + bh, x + nw, y + bh)  # shoulder
+    _draw_bezier_pil(draw, tx,
+                     (x + nw, y + bh),
+                     (x + nw * 0.5, y + bh),
+                     (x, y + bh - nd * 0.5),
+                     (x, y + bh - nd))                     # neckline
+    _draw_line_pil(draw, tx, x, y + bh - nd, x, y)         # fold edge
+    # fold edge color blue
+    _draw_line_pil(draw, tx, x - 0.05, y, x - 0.05, y + bh,
+                   color="blue", width=1, dashed=True)
+    draw.text(tx(x + 1, y + bh - 3), "Bodice", fill="black", font=label_font)
+    draw.text((10, 10), f"Baby Dress preview", fill="black", font=font)
+
+    return img
+
+
+def _preview_bib(spec):
+    bw = spec["neck_circ"] * 0.9
+    bh = bw * 1.1
+    nr = spec["neck_circ"] / (2 * math.pi) + 0.5
+    ow = nr * 0.8
+
+    img, draw, tx = _setup_canvas(bw + 2, bh + 2)
+    font = _get_font(14)
+
+    cx = 1.0 + bw / 2
+    bottom = 1.0
+    top = bottom + bh
+    lx = cx - bw / 2
+    rx = cx + bw / 2
+
+    _draw_bezier_pil(draw, tx,
+                     (lx, bottom + bh * 0.3), (lx, bottom),
+                     (rx, bottom), (rx, bottom + bh * 0.3))
+    _draw_bezier_pil(draw, tx,
+                     (lx, bottom + bh * 0.3), (lx - 0.5, bottom + bh * 0.6),
+                     (lx + 1, top - 1.5), (cx - ow - 1.5, top - 1.0))
+    _draw_bezier_pil(draw, tx,
+                     (rx, bottom + bh * 0.3), (rx + 0.5, bottom + bh * 0.6),
+                     (rx - 1, top - 1.5), (cx + ow + 1.5, top - 1.0))
+
+    # neck hole (keyhole)
+    _draw_bezier_pil(draw, tx,
+                     (cx - ow - 1.5, top - 1.0), (cx - ow, top),
+                     (cx - ow, top), (cx - ow, top - nr * 0.3))
+    _draw_bezier_pil(draw, tx,
+                     (cx - ow, top - nr * 0.3), (cx - ow * 0.6, top - nr * 1.4),
+                     (cx - nr * 0.9, top - nr * 1.8), (cx, top - nr * 1.8))
+    _draw_bezier_pil(draw, tx,
+                     (cx, top - nr * 1.8), (cx + nr * 0.9, top - nr * 1.8),
+                     (cx + ow * 0.6, top - nr * 1.4), (cx + ow, top - nr * 0.3))
+    _draw_bezier_pil(draw, tx,
+                     (cx + ow, top - nr * 0.3), (cx + ow, top),
+                     (cx + ow, top), (cx + ow + 1.5, top - 1.0))
+
+    draw.text((10, 10), "Baby Bib preview", fill="black", font=font)
+    return img
+
+
+def _preview_bloomers(spec):
+    wh = spec["waist"] / 2 + 4.0
+    hh = spec["hip"] / 2 + 4.0
+    rise = (spec["rise_f"] + spec["rise_b"]) / 2 + 2.0
+    inseam = 3.0
+
+    img, draw, tx = _setup_canvas(hh + 2, rise + inseam + 2)
+    font = _get_font(14)
+
+    x0, y0 = 1.0, 1.0 + inseam
+    wl = (x0, y0 + rise)
+    wr = (x0 + wh, y0 + rise)
+    hr = (x0 + hh, y0 + rise * 0.3)
+    crotch = (x0 + wh * 0.15, y0)
+    li = (x0 + wh * 0.15, y0 - inseam)
+    lo = (x0 + hh, y0 + rise * 0.15)
+
+    _draw_line_pil(draw, tx, wl[0], wl[1], wr[0], wr[1])
+    _draw_bezier_pil(draw, tx, wr,
+                     (wr[0] + 0.3, wr[1] - rise * 0.3),
+                     (hr[0], hr[1] + rise * 0.1), hr)
+    _draw_line_pil(draw, tx, hr[0], hr[1], lo[0], lo[1])
+    _draw_bezier_pil(draw, tx, lo,
+                     (lo[0] - 3, lo[1] - 1.5),
+                     (li[0] + 3, li[1] + 0.5), li)
+    _draw_line_pil(draw, tx, li[0], li[1], crotch[0], crotch[1])
+    _draw_bezier_pil(draw, tx, crotch,
+                     (crotch[0] - 1, crotch[1] + 0.5),
+                     (wl[0] + 0.5, wl[1] - rise * 0.6),
+                     (wl[0], wl[1] - rise * 0.4))
+    _draw_line_pil(draw, tx, wl[0], wl[1] - rise * 0.4, wl[0], wl[1],
+                   color="blue", width=1, dashed=True)
+
+    draw.text((10, 10), "Baby Bloomers preview", fill="black", font=font)
+    return img
+
+
+def _preview_bonnet(spec):
+    fw = spec["head"] / 2 - 2.0
+    ch = spec["head"] / 4 + 2.0
+    bw = spec["head"] / 3
+
+    img, draw, tx = _setup_canvas(fw * 2 + 2, ch + 2)
+    font = _get_font(14)
+
+    cx = 1.0 + fw
+    cb = 1.0
+    ct = cb + ch
+
+    _draw_bezier_pil(draw, tx,
+                     (cx - fw, cb), (cx - fw * 0.5, cb - 0.3),
+                     (cx + fw * 0.5, cb - 0.3), (cx + fw, cb))
+    _draw_bezier_pil(draw, tx,
+                     (cx - fw, cb), (cx - fw - 1, cb + ch * 0.5),
+                     (cx - bw / 2 - 0.5, ct - 0.3), (cx - bw / 2, ct))
+    _draw_bezier_pil(draw, tx,
+                     (cx + fw, cb), (cx + fw + 1, cb + ch * 0.5),
+                     (cx + bw / 2 + 0.5, ct - 0.3), (cx + bw / 2, ct))
+    _draw_line_pil(draw, tx, cx - bw / 2, ct, cx + bw / 2, ct,
+                   color="blue", width=1, dashed=True)
+
+    draw.text((10, 10), "Baby Bonnet crown preview", fill="black", font=font)
+    return img
+
+
+def _preview_generic_rect(title, w, h):
+    """Fallback for patterns without custom preview: labeled bounding box."""
+    img, draw, tx = _setup_canvas(w + 2, h + 2)
+    font = _get_font(14)
+    small = _get_font(10)
+
+    x, y = 1.0, 1.0
+    _draw_line_pil(draw, tx, x, y, x + w, y)
+    _draw_line_pil(draw, tx, x + w, y, x + w, y + h)
+    _draw_line_pil(draw, tx, x + w, y + h, x, y + h)
+    _draw_line_pil(draw, tx, x, y + h, x, y)
+
+    draw.text((10, 10), title, fill="black", font=font)
+    draw.text(tx(x + 0.3, y + h * 0.5),
+              f"approx. {w:.1f} x {h:.1f} cm", fill="gray", font=small)
+    return img
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+def generate_preview(pattern_key: str, size_label: str) -> str:
+    spec = get_size(size_label)
+
+    if pattern_key == "dress":
+        img = _preview_dress(spec)
+    elif pattern_key == "bib":
+        img = _preview_bib(spec)
+    elif pattern_key == "bloomers":
+        img = _preview_bloomers(spec)
+    elif pattern_key == "bonnet":
+        img = _preview_bonnet(spec)
+    elif pattern_key == "kimono_top":
+        w = spec["chest"] / 4 + 2.0
+        h = spec["length"] * 0.9
+        img = _preview_generic_rect("Kimono Top (back piece)", w, h)
+    elif pattern_key == "pants":
+        w = spec["hip"] / 4 + 3.0
+        h = spec["length"] * 1.15 + (spec["rise_f"] + spec["rise_b"]) / 2 + 3
+        img = _preview_generic_rect("Pants leg piece", w, h)
+    elif pattern_key == "tshirt":
+        w = spec["chest"] / 4 + 2.5
+        h = spec["length"] * 0.85
+        img = _preview_generic_rect("T-Shirt front", w, h)
+    elif pattern_key == "romper":
+        w = spec["chest"] / 4 + 2.0
+        h = spec["length"] * 0.55 + (spec["rise_f"] + spec["rise_b"]) / 2 + 4
+        img = _preview_generic_rect("Romper front", w, h)
+    elif pattern_key == "sleep_sack":
+        w = spec["chest"] / 4 + 12.0
+        h = spec["length"] + 20.0
+        img = _preview_generic_rect("Sleep Sack back", w, h)
+    else:
+        return f"Error: unknown pattern '{pattern_key}'"
+
+    file_path = os.path.abspath(f"preview_{pattern_key}_{size_label}.png")
+    img.save(file_path, "PNG")
+    return file_path

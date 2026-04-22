@@ -14,6 +14,8 @@ from mcp.server.fastmcp import FastMCP
 from patterns import dress, bib, bloomers, bonnet
 from patterns import kimono_top, pants, tshirt, romper, sleep_sack
 import features
+import preview
+import cutting_layout
 
 mcp = FastMCP("BabyFashionEngine_Complete")
 
@@ -154,6 +156,37 @@ def generate_shopping_list(pattern_keys: list, size_label: str) -> str:
     Returns fabric yardage + notions (thread, elastic, snaps, etc.).
     """
     return features.generate_shopping_list(pattern_keys, size_label)
+
+
+@mcp.tool()
+def generate_pattern_preview(pattern_key: str, size_label: str) -> str:
+    """Save a quick PNG thumbnail of a pattern outline (faster than PDF).
+
+    Useful for verifying overall shape and proportions before generating
+    the full tiled PDF. Returns the absolute file path of the PNG.
+
+    pattern_key: one of 'dress', 'bib', 'bloomers', 'bonnet', 'kimono_top',
+                 'pants', 'tshirt', 'romper', 'sleep_sack'.
+    """
+    path = preview.generate_preview(pattern_key, size_label)
+    if path.startswith("Error"):
+        return path
+    return f"Preview saved: {path}"
+
+
+@mcp.tool()
+def generate_cutting_layout(pattern_key: str, size_label: str,
+                             fabric_width_cm: int = 115) -> str:
+    """Generate a PNG showing how to lay out pattern pieces on fabric.
+
+    fabric_width_cm: 90, 115, or 150. Common bolt widths.
+    Helps minimize fabric waste by showing a shelf-packed layout.
+    Returns the absolute file path of the PNG.
+    """
+    path = cutting_layout.generate_layout(pattern_key, size_label, fabric_width_cm)
+    if path.startswith("Error"):
+        return path
+    return f"Cutting layout saved: {path}"
 
 
 if __name__ == "__main__":
