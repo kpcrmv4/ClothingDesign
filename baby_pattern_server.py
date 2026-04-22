@@ -16,6 +16,7 @@ from patterns import kimono_top, pants, tshirt, romper, sleep_sack
 import features
 import preview
 import cutting_layout
+import customize
 
 mcp = FastMCP("BabyFashionEngine_Complete")
 
@@ -187,6 +188,34 @@ def generate_cutting_layout(pattern_key: str, size_label: str,
     if path.startswith("Error"):
         return path
     return f"Cutting layout saved: {path}"
+
+
+@mcp.tool()
+def suggest_pattern_from_description(description: str) -> str:
+    """Analyse a text description and suggest which pattern tool(s) to use.
+
+    Use this after viewing a reference image and writing a summary, or when
+    the user describes what they want in free text. Returns ranked pattern
+    matches plus suggested parameters.
+
+    Does NOT generate files; follow up with a specific generate_*_pattern call.
+    """
+    return customize.suggest_pattern_from_description(description)
+
+
+@mcp.tool()
+def customize_pattern(pattern_key: str, size_label: str, changes: dict) -> str:
+    """Plan a customized pattern call from a structured 'changes' dict.
+
+    Supported keys in changes:
+      - seam_allowance: float (cm)
+      - style: 'long' or 'short' (pants only)
+      - sleeve: 'long' or 'short' (tshirt only)
+      - notes: free-text (stored for future context)
+
+    Returns a recommended tool call. Does not produce files directly.
+    """
+    return customize.customize_pattern(pattern_key, size_label, changes)
 
 
 if __name__ == "__main__":
