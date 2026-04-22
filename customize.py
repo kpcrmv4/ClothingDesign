@@ -21,6 +21,12 @@ from features import PATTERN_META
 # Description keyword -> pattern key mapping
 # ============================================================
 _KEYWORDS = {
+    # flutter_romper MUST be checked before generic romper so it wins
+    # when both sets of keywords appear
+    "flutter_romper": ["flutter", "off shoulder", "off-shoulder",
+                       "ruffle neck", "ruffle romper", "peasant neckline",
+                       "flounce", "คอระบาย", "ชุดหมีระบาย",
+                       "ชุดหมีคอระบาย", "เปิดไหล่"],
     "dress": ["dress", "sundress", "frock", "เดรส", "กระโปรง"],
     "bib": ["bib", "drool", "ผ้ากันเปื้อน", "กันเปื้อน"],
     "bloomers": ["bloomer", "diaper cover", "nappy cover", "กางเกงใน"],

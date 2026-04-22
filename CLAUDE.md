@@ -63,7 +63,7 @@ clothingdesign/
 
 ## Tool ที่จะมีทั้งหมด
 
-### Pattern generators (9 ตัว)
+### Pattern generators (10 ตัว)
 | # | Tool | Description |
 |---|------|-------------|
 | 1 | `generate_full_dress_pattern` | เดรสไม่มีแขน สาย + ระบาย |
@@ -73,8 +73,9 @@ clothingdesign/
 | 5 | `generate_kimono_top_pattern` | เสื้อป้ายผูกข้าง ไม่มีกระดุม |
 | 6 | `generate_pants_pattern` | กางเกงเอวยางยืด ขายาว/ขาสั้น |
 | 7 | `generate_tshirt_pattern` | เสื้อยืดแขนสั้น คอกลม |
-| 8 | `generate_romper_pattern` | ชุดหมี เสื้อ+กางเกง |
+| 8 | `generate_romper_pattern` | ชุดหมี แบบสายไหล่ snap เป้า |
 | 9 | `generate_sleep_sack_pattern` | ถุงนอนซิป |
+| 10 | `generate_flutter_romper_pattern` | ชุดหมีคอระบาย off-shoulder (flutter sleeves) |
 
 ### Support tools (7 ตัว)
 | # | Tool | Description |

@@ -13,6 +13,7 @@ from mcp.server.fastmcp import FastMCP
 
 from patterns import dress, bib, bloomers, bonnet
 from patterns import kimono_top, pants, tshirt, romper, sleep_sack
+from patterns import flutter_romper
 import features
 import preview
 import cutting_layout
@@ -121,6 +122,27 @@ def generate_sleep_sack_pattern(size_label: str,
     Fabric: cotton jersey, flannel, or muslin.
     """
     return sleep_sack.generate(size_label, seam_allowance)
+
+
+@mcp.tool()
+def generate_flutter_romper_pattern(size_label: str,
+                                     seam_allowance: float = 1.0,
+                                     ruffle_height: float = 7.0,
+                                     ruffle_fullness: float = 1.8,
+                                     crotch_snaps: int = 3) -> str:
+    """Generate off-shoulder flutter romper (elastic neckline + cascading ruffle).
+
+    Matches the popular handmade boutique style: no shoulder seams,
+    ruffle acts as flutter sleeves, bubble body, snap crotch.
+    Best for girls 0-18 months.
+
+    ruffle_height: depth of the flounce in cm (default 7). Typical 5-9.
+    ruffle_fullness: gather ratio vs neckline (default 1.8x). Typical 1.5-2.2.
+    crotch_snaps: number of snaps across crotch (default 3).
+    """
+    return flutter_romper.generate(size_label, seam_allowance,
+                                    ruffle_height, ruffle_fullness,
+                                    crotch_snaps)
 
 
 # ============================================================

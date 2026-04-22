@@ -233,6 +233,59 @@ def _preview_bonnet(spec):
     return img
 
 
+def _preview_flutter_romper(spec):
+    top_half = (spec["chest"] + 12) / 4
+    chest_half = (spec["chest"] + 6) / 4
+    hip_half = (spec["hip"] + 8) / 4
+    crotch_half = 3.0
+    rise = (spec["rise_f"] + spec["rise_b"]) / 2 + 2.0
+    body_torso = spec["length"] * 0.55
+    shoulder_drop = 2.5
+    total_h = shoulder_drop + body_torso + rise
+    leg_drop = 8.0
+    ruffle_h = 7.0
+
+    img, draw, tx = _setup_canvas(hip_half + 2, total_h + ruffle_h + 2)
+    font = _get_font(14)
+    sfont = _get_font(9)
+
+    x, y = 1.0, 1.0
+    top_l = (x, y + total_h)
+    top_r = (x + top_half, y + total_h)
+    chest_r = (x + chest_half, y + total_h - shoulder_drop)
+    hip_r = (x + hip_half, y + rise + leg_drop)
+    crotch_r = (x + crotch_half, y)
+
+    _draw_line_pil(draw, tx, top_l[0], top_l[1], top_r[0], top_r[1])
+    _draw_bezier_pil(draw, tx, top_r,
+                     (top_r[0] + 0.8, top_r[1] - shoulder_drop * 0.3),
+                     (chest_r[0] - 0.3, chest_r[1] + shoulder_drop * 0.3),
+                     chest_r)
+    mid_y = (chest_r[1] + hip_r[1]) / 2
+    _draw_bezier_pil(draw, tx, chest_r,
+                     (chest_r[0] + 0.4, mid_y + 1),
+                     (hip_r[0] + 0.2, mid_y - 1), hip_r)
+    _draw_bezier_pil(draw, tx, hip_r,
+                     (hip_r[0] - 2.5, hip_r[1] - leg_drop * 0.6),
+                     (crotch_r[0] + 2.5, crotch_r[1] + 2), crotch_r)
+    _draw_line_pil(draw, tx, crotch_r[0], crotch_r[1], x, y)
+    _draw_line_pil(draw, tx, x, y, x, y + total_h,
+                   color="blue", width=1, dashed=True)
+
+    # ruffle strip sketch above body top edge
+    ruffle_y = y + total_h + 0.5
+    _draw_line_pil(draw, tx, x, ruffle_y, x + top_half, ruffle_y, color="gray")
+    _draw_line_pil(draw, tx, x, ruffle_y + ruffle_h * 0.4,
+                   x + top_half, ruffle_y + ruffle_h * 0.4, color="gray")
+
+    draw.text((10, 10), "Flutter Romper preview", fill="black", font=font)
+    draw.text(tx(x + 0.3, y + total_h * 0.3),
+              "body piece", fill="#555", font=sfont)
+    draw.text(tx(x + 0.3, ruffle_y + 0.2),
+              "ruffle sketch (not to scale)", fill="#555", font=sfont)
+    return img
+
+
 def _preview_generic_rect(title, w, h):
     """Fallback for patterns without custom preview: labeled bounding box."""
     img, draw, tx = _setup_canvas(w + 2, h + 2)
@@ -285,6 +338,8 @@ def generate_preview(pattern_key: str, size_label: str) -> str:
         w = spec["chest"] / 4 + 12.0
         h = spec["length"] + 20.0
         img = _preview_generic_rect("Sleep Sack back", w, h)
+    elif pattern_key == "flutter_romper":
+        img = _preview_flutter_romper(spec)
     else:
         return f"Error: unknown pattern '{pattern_key}'"
 

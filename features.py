@@ -104,6 +104,17 @@ PATTERN_META = {
         "pieces": [("Front", 2, "left + right for zipper"),
                    ("Back", 1, "cut on fold")],
     },
+    "flutter_romper": {
+        "title": "Off-Shoulder Flutter Romper",
+        "difficulty": "Intermediate",
+        "time_hours": "3-4",
+        "fabric_types": ["cotton lawn", "poplin", "double gauze", "lightweight cotton"],
+        "notions": ["matching thread",
+                    "5mm elastic for neckline + leg openings",
+                    "3 KAM snaps (crotch)"],
+        "pieces": [("Body", 2, "cut on fold, front + back identical"),
+                   ("Ruffle strip", 1, "long strip, gather")],
+    },
 }
 
 
@@ -246,6 +257,17 @@ def calculate_fabric(pattern_key: str, size_label: str) -> dict:
         pieces = [
             ("Back (x1)", chest_half, length),
             ("Front (x2 for zipper)", chest_half, length),
+        ]
+        extra = 0
+    elif pattern_key == "flutter_romper":
+        hip_half = (spec["hip"] + 8) / 4
+        rise = (spec["rise_f"] + spec["rise_b"]) / 2 + 2.0
+        body_h = 2.5 + spec["length"] * 0.55 + rise
+        top_half = (spec["chest"] + 12) / 4
+        ruffle_len = top_half * 2 * 2 * 1.8
+        pieces = [
+            ("Body (x2 fold)", hip_half, body_h * 2),
+            ("Ruffle strip", ruffle_len, 7.0),
         ]
         extra = 0
     else:
