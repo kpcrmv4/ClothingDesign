@@ -103,8 +103,8 @@ def _run_in_subdir(label: str, fn, *args, **kwargs):
 def _run_pattern(pattern_key: str, size_label: str, gen_fn, *args,
                   label_extra: str = "", **kwargs):
     """Generate a pattern PDF + preview PNG into the same fresh subfolder,
-    then rebuild the index. Returns the PDF generator's text result with
-    the preview path appended."""
+    rebuild the index, and (if AUTO_PUBLISH) push to GitHub. Returns the
+    PDF generator's text result with status lines appended."""
     label = f"{pattern_key}_{size_label}"
     if label_extra:
         label += f"_{label_extra}"
@@ -128,7 +128,23 @@ def _run_pattern(pattern_key: str, size_label: str, gen_fn, *args,
     except Exception:
         pass
     gallery_line = f"\nแคตตาล็อก: file:///{INDEX_HTML.replace(os.sep, '/')}"
-    return f"{pdf_result}{preview_line}{gallery_line}"
+
+    # Auto-publish to GitHub Pages if enabled
+    publish_line = ""
+    if AUTO_PUBLISH:
+        try:
+            title = PATTERN_TITLES.get(pattern_key, pattern_key)
+            tag = f"{title} {size_label}"
+            if label_extra:
+                tag += f" ({label_extra})"
+            ts = datetime.now().strftime("%H:%M")
+            commit_msg = f"เพิ่ม {tag} — {ts}"
+            res = _publish(commit_msg)
+            publish_line = f"\n\n{res['summary']}"
+        except Exception as e:
+            publish_line = f"\n\n⚠ auto-publish skipped: {e}"
+
+    return f"{pdf_result}{preview_line}{gallery_line}{publish_line}"
 
 
 def _migrate_loose_root_files():
@@ -617,8 +633,16 @@ def rebuild_gallery_index() -> str:
 # ============================================================
 # GIT / GITHUB PAGES PUBLISHING
 # ============================================================
+# Set to False to disable auto-publish after every pattern generation
+AUTO_PUBLISH = True
+
+
 def _git(*args):
-    """Run git in the project folder. Returns (returncode, stdout, stderr)."""
+    """Run git in the project folder. Returns (returncode, stdout, stderr).
+    GIT_TERMINAL_PROMPT=0 ensures git never blocks waiting for credentials —
+    if creds aren't cached, push fails fast with a clear error."""
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
     r = subprocess.run(
         ["git", *args],
         cwd=_HERE,
@@ -626,6 +650,7 @@ def _git(*args):
         text=True,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     return r.returncode, r.stdout.strip(), r.stderr.strip()
 
@@ -641,35 +666,32 @@ def _pages_url() -> str:
     return f"https://{user.lower()}.github.io/{repo}/"
 
 
-@mcp.tool()
-def publish_gallery(message: str = "") -> str:
-    """Commit + push the catalog (index.html + outputs/) to GitHub.
+def _publish(message: str = "") -> dict:
+    """Internal: stage + commit + push. Returns dict with status info.
 
-    GitHub Pages will auto-rebuild within ~1 minute and the new patterns
-    will appear at https://<user>.github.io/<repo>/.
-
-    Use this after generating one or more patterns to publish them publicly.
-    Requires:
-      - the project folder is a git repo with an 'origin' remote on GitHub
-      - git credentials are configured (git config user.email/name)
-      - your machine is authenticated to push (token / Credential Manager)
-
-    message: optional commit message. If empty, an auto message is used.
+    Result dict keys: ok (bool), summary (str — short status line for the
+    pattern tool to append), detail (str — full multi-line message).
     """
-    # 1. Verify git repo
+    # 1. Repo present?
     rc, _, err = _git("rev-parse", "--git-dir")
     if rc != 0:
-        return f"❌ ไม่ใช่ git repo: {err}\nรัน 'git init' ก่อน หรือ clone repo ใหม่"
+        return {"ok": False,
+                "summary": "⚠ publish ข้าม (ไม่ใช่ git repo)",
+                "detail": f"❌ ไม่ใช่ git repo: {err}"}
 
-    # 2. Stage everything
+    # 2. Stage
     rc, _, err = _git("add", "-A")
     if rc != 0:
-        return f"❌ git add ล้มเหลว:\n{err}"
+        return {"ok": False,
+                "summary": "⚠ git add ล้มเหลว",
+                "detail": f"❌ git add: {err}"}
 
     # 3. Anything to commit?
     rc, _, _ = _git("diff", "--cached", "--quiet")
     if rc == 0:
-        return "ℹ️ ไม่มีการเปลี่ยนแปลงใหม่ที่จะ publish (working tree สะอาด)"
+        return {"ok": True,
+                "summary": "ℹ Working tree สะอาด — ไม่มีอะไรต้อง commit",
+                "detail": "ℹ ไม่มีการเปลี่ยนแปลงใหม่"}
 
     # 4. Commit
     if not message:
@@ -680,39 +702,67 @@ def publish_gallery(message: str = "") -> str:
     rc, _, err = _git("commit", "-m", message)
     if rc != 0:
         if "Please tell me who you are" in err or "user.email" in err:
-            return ("❌ git ยังไม่รู้ identity\n"
-                     "รันคำสั่งนี้ก่อน:\n"
-                     "  git config --global user.email \"your@email.com\"\n"
-                     "  git config --global user.name \"Your Name\"")
-        return f"❌ git commit ล้มเหลว:\n{err}"
+            hint = ("git ยังไม่รู้ identity — รันคำสั่งนี้ก่อน:\n"
+                    "  git config --global user.email \"your@email.com\"\n"
+                    "  git config --global user.name \"Your Name\"")
+            return {"ok": False, "summary": "⚠ ยังไม่ได้ตั้ง git identity",
+                    "detail": hint}
+        return {"ok": False, "summary": "⚠ git commit ล้มเหลว",
+                "detail": f"❌ git commit: {err}"}
 
-    # 5. Get branch
     rc, branch, _ = _git("branch", "--show-current")
     branch = branch or "HEAD"
 
-    # 6. Push
+    # 5. Push
     rc, _, err = _git("push", "origin", branch)
     if rc != 0:
-        # commit succeeded — give them recovery info
-        return (f"✓ Commit สำเร็จ: {message}\n"
-                 f"❌ git push ล้มเหลว:\n{err}\n\n"
-                 f"แก้ไขแล้ว push เองด้วย:\n"
-                 f"  cd {_HERE}\n"
-                 f"  git push origin {branch}")
+        if "could not read Username" in err or "Authentication failed" in err or "terminal prompts disabled" in err:
+            hint = ("ยังไม่ได้ login GitHub บนเครื่องนี้ — รันใน PowerShell ครั้งเดียว:\n"
+                    f"  cd {_HERE}\n"
+                    f"  git push origin {branch}\n"
+                    "Git Credential Manager จะเด้งหน้าต่าง login มา หลังจากนั้นจะจำให้")
+            return {"ok": False,
+                    "summary": "✓ commit แล้ว แต่ push ล้มเหลว (auth)",
+                    "detail": hint}
+        return {"ok": False,
+                "summary": "✓ commit แล้ว แต่ push ล้มเหลว",
+                "detail": f"git push: {err}\n\npush เองด้วย:\n  cd {_HERE}\n  git push origin {branch}"}
 
-    # 7. Success — point to Pages URL
     pages = _pages_url()
-    lines = [
-        f"✓ Commit: {message}",
-        f"✓ Push สำเร็จ → branch '{branch}'",
-    ]
+    summary = f"🚀 Push ขึ้น GitHub แล้ว ({branch}) — Pages อัปเดตใน 1-2 นาที"
     if pages:
-        lines.append("")
-        lines.append("⏳ GitHub Pages จะอัปเดตภายใน 1-2 นาที:")
-        lines.append(f"   {pages}")
-        lines.append("")
-        lines.append("ครั้งแรก: เปิด Settings > Pages เลือก source = branch ปัจจุบัน")
-    return "\n".join(lines)
+        summary += f"\n   {pages}"
+    return {"ok": True, "summary": summary,
+            "detail": f"✓ Commit: {message}\n✓ Push สำเร็จ → {branch}\n\n{pages}"}
+
+
+@mcp.tool()
+def publish_gallery(message: str = "") -> str:
+    """Manually commit + push the catalog (index.html + outputs/) to GitHub.
+
+    Use this if AUTO_PUBLISH is disabled, or to force a custom commit message.
+    By default, every generate_*_pattern call already auto-publishes.
+
+    message: optional commit message.
+    """
+    result = _publish(message)
+    return result["detail"] or result["summary"]
+
+
+@mcp.tool()
+def set_auto_publish(enabled: bool) -> str:
+    """Enable/disable auto-publish to GitHub after each pattern generation.
+
+    When enabled (default): every successful generate_*_pattern automatically
+    runs git add + commit + push. The catalog on GitHub Pages stays in sync.
+
+    When disabled: patterns are only saved locally. Use publish_gallery
+    manually when you want to publish a batch.
+    """
+    global AUTO_PUBLISH
+    AUTO_PUBLISH = bool(enabled)
+    state = "เปิด" if AUTO_PUBLISH else "ปิด"
+    return f"✓ Auto-publish: {state}"
 
 
 @mcp.tool()
