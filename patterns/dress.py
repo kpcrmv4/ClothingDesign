@@ -38,12 +38,12 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_dress_bodice(c, bx, by, bodice_w, bodice_h,
                            neck_width, neck_drop, shoulder_w,
                            armhole_width, armhole_drop, sa)
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((bx + 0.3) * cm, (by + bodice_h - 1) * cm,
-                     "1. Bodice  -  Cut 2 on fold")
-        c.setFont("Helvetica", 8)
+                     "1. ตัวเสื้อ - ตัด 2 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 8)
         c.drawString((bx + 0.3) * cm, (by + bodice_h - 1.7) * cm,
-                     f"Finished: {bodice_w:.1f} x {bodice_h:.1f} cm")
+                     f"สำเร็จ: {bodice_w:.1f} x {bodice_h:.1f} ซม")
         draw_grain_line(c, bx + bodice_w * 0.7, by + 2,
                         bx + bodice_w * 0.7, by + bodice_h - 2)
         draw_fold_edge(c, bx, by, bx, by + bodice_h)
@@ -59,12 +59,12 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         c.rect((sx - sa) * cm, (sy - sa) * cm,
                (strap_w + sa * 2) * cm, (strap_h + sa * 2) * cm)
         c.setDash([], 0)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Tahoma-Bold", 9)
         c.drawString((sx + 0.2) * cm, (sy + strap_h - 0.7) * cm,
-                     "2. Strap - Cut 2")
-        c.setFont("Helvetica", 7)
+                     "2. สายไหล่ - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 7)
         c.drawString((sx + 0.2) * cm, (sy + strap_h - 1.3) * cm,
-                     f"{strap_w:.1f} x {strap_h:.1f} cm")
+                     f"{strap_w:.1f} x {strap_h:.1f} ซม")
         draw_grain_line(c, sx + strap_w / 2, sy + 1,
                         sx + strap_w / 2, sy + strap_h - 1)
 
@@ -78,54 +78,54 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         c.rect((rx - sa) * cm, (ry - sa) * cm,
                (ruffle_w + sa * 2) * cm, (ruffle_h + sa * 2) * cm)
         c.setDash([], 0)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Tahoma-Bold", 9)
         c.drawString((rx + 0.2) * cm, (ry + ruffle_h - 0.7) * cm,
-                     "3. Ruffle - Cut 2 (gather top edge)")
-        c.setFont("Helvetica", 7)
+                     "3. ระบาย - ตัด 2 ชิ้น (รูดจีบขอบบน)")
+        c.setFont("Tahoma", 7)
         c.drawString((rx + 0.2) * cm, (ry + ruffle_h - 1.3) * cm,
-                     f"{ruffle_w:.1f} x {ruffle_h:.1f} cm  (1.5x hem width)")
+                     f"{ruffle_w:.1f} x {ruffle_h:.1f} ซม  (กว้าง 1.5 เท่าชายผ้า)")
         draw_grain_line(c, rx + ruffle_w / 2 - 2, ry + ruffle_h / 2,
                         rx + ruffle_w / 2 + 2, ry + ruffle_h / 2)
         for frac in (0.25, 0.5, 0.75):
             draw_notch(c, rx + ruffle_w * frac, ry + ruffle_h, angle_deg=270)
 
     instructions = [
-        f"BABY DRESS - {size_label}",
+        f"เดรสเด็ก - {size_label}",
         "",
-        "Materials:",
-        "  - Light cotton or linen, approx. 0.6-0.8 m of 115cm fabric",
-        "  - Matching thread, 2-3 small buttons or snaps (optional)",
+        "วัสดุ:",
+        "  - ผ้าคอตตอนหรือลินินไม่หนา ประมาณ 0.6-0.8 ม. ผ้ากว้าง 115 ซม",
+        "  - ด้ายสีเข้มกับผ้า กระดุมหรือ snap ขนาดเล็ก 2-3 เม็ด (ทางเลือก)",
         "",
-        "Legend:",
-        "  Solid line    = cutting line",
-        "  Dashed line   = seam allowance (add when cutting)",
-        "  Blue chain    = cut on fold, do not cut this edge",
-        "  V-notch       = match these marks across pieces",
-        "  Arrow 'GRAIN' = align with fabric lengthwise grain",
+        "คำอธิบายสัญลักษณ์:",
+        "  เส้นตัน      = เส้นตัด",
+        "  เส้นประ      = ส่วนตะเข็บ (เพิ่มเมื่อตัด)",
+        "  โซ่สีน้ำเงิน  = ตัดบนรอยพับ อย่าตัดขอบนี้",
+        "  รอยหยักวี    = จับคู่ด้วยเครื่องหมายนี้",
+        "  ลูกศรเมล็ด   = จัดให้ชิดไปตามเส้นเนื้อผ้า",
         "",
-        "Sewing order:",
-        "  1. Cut 2 bodices on fold (front + back)",
-        "  2. Cut 2 straps",
-        "  3. Cut 2 ruffles",
-        "  4. Sew bodice shoulder seams (front to back at strap points)",
-        "  5. Fold straps lengthwise RST, sew, turn, press",
-        "  6. Attach straps between front + back at shoulder",
-        "  7. Sew side seams of bodice",
-        "  8. Gather ruffle top edge to match bodice hem",
-        "  9. Attach ruffle to bodice hem, RST",
-        " 10. Hem ruffle bottom with narrow rolled hem",
-        " 11. Finish neckline + armholes with bias binding",
+        "ลำดับการเย็บ:",
+        "  1. ตัดตัวเสื้อ 2 ชิ้นบนรอยพับ (หน้า + หลัง)",
+        "  2. ตัดสายไหล่ 2 ชิ้น",
+        "  3. ตัดระบาย 2 ชิ้น",
+        "  4. เย็บตะเข็บไหล่ตัวเสื้อ (หน้ากับหลังบริเวณสายไหล่)",
+        "  5. พับสายไหล่ยาวตามปกติ เย็บ หมุนให้เรียบ",
+        "  6. ติดสายไหล่ระหว่างหน้าและหลังที่ไหล่",
+        "  7. เย็บตะเข็บด้านข้างตัวเสื้อ",
+        "  8. รูดจีบขอบบนของระบายให้มีขนาดเท่าชายตัวเสื้อ",
+        "  9. ติดระบายกับชายเสื้อแบบด้านในประกบใน",
+        " 10. จบชายระบายด้วยความสวยงาม",
+        " 11. จบคอเสื้อและวงแขนด้วยแถบผ้าเอียง",
         "",
-        f"Seam allowance included: {seam_allowance} cm on all edges",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม ทุกขอบ",
     ]
 
     file_path = os.path.abspath(f"dress_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Dress", size_label,
+    total_pages = tile_and_save(file_path, "เดรสเด็ก", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Dress pattern generated: {file_path}\n"
             f"Size: {size_label}  |  Pages: {total_pages} A4 sheets\n"
-            f"Bodice: {bodice_w:.1f}x{bodice_h:.1f} cm  |  "
+            f"ตัวเสื้อ: {bodice_w:.1f}x{bodice_h:.1f} cm  |  "
             f"Ruffle: {ruffle_w:.1f}x{ruffle_h:.1f} cm")
 
 

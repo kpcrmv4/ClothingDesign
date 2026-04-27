@@ -74,10 +74,10 @@ def generate(size_label: str, seam_allowance: float = 0.7) -> str:
                cx * cm, (top_y - neck_r * 1.8 - 2.0) * cm)
         c.setDash([], 0)
 
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.55) * cm,
-                            "Bib - Cut 2")
-        c.setFont("Helvetica", 8)
+                            "Bib - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 8)
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.48) * cm,
                             f"Size {size_label}")
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.42) * cm,
@@ -88,33 +88,33 @@ def generate(size_label: str, seam_allowance: float = 0.7) -> str:
 
         c.setFillColor(red)
         c.circle(cx * cm, (top_y - neck_r * 1.8 - 2.2) * cm, 0.15 * cm, fill=1)
-        c.setFont("Helvetica", 7)
+        c.setFont("Tahoma", 7)
         c.drawString((cx + 0.3) * cm, (top_y - neck_r * 1.8 - 2.3) * cm,
                      "snap")
         c.setFillColor(black)
 
     instructions = [
-        f"BABY BIB - {size_label}",
+        f"ผ้ากันเปื้อน - {size_label}",
         "",
-        "Materials:",
-        "  - 1 piece cotton or quilting fabric (front)",
-        "  - 1 piece terry / bamboo / fleece (absorbent backing)",
-        "  - 1 KAM snap set OR 20 cm velcro",
-        "  - Approx. 25 x 25 cm of each fabric",
+        "วัสดุ:",
+        "  - ผ้าคอตตอนหรือผ้าเย็บลัว 1 ชิ้น (หน้า)",
+        "  - ผ้าเทรี่หรือแบมบูหรือผ้าขนนุ่ม (ซับน้ำหลัง) 1 ชิ้น",
+        "  - ชุดกระดุม KAM หรือเวลโครส 20 ซม",
+        "  - ประมาณ 25 x 25 ซม ของแต่ละชนิดผ้า",
         "",
-        "Sewing order:",
-        "  1. Cut 1 front + 1 backing using the pattern",
-        "  2. Place RST (right sides together)",
-        "  3. Sew around all edges leaving a 5cm gap at bottom",
-        "  4. Clip curves, turn right side out through gap",
-        "  5. Press flat, topstitch 3mm from edge (closes gap)",
-        "  6. Install snap at back neck slit",
+        "ลำดับการเย็บ:",
+        "  1. ตัดหน้า 1 ชิ้น + หลัง 1 ชิ้นตามแบบ",
+        "  2. วางด้านในประกบใน",
+        "  3. เย็บรอบขอบทั้งหมด เว้นช่องว่าง 5 ซม ด้านล่าง",
+        "  4. ตัดโค้งด้อม หมุนให้ด้านหน้าออกมาผ่านช่องว่าง",
+        "  5. รีดเรียบ เย็บตามขอบ 3 มม (ปิดช่องว่าง)",
+        "  6. ติดกระดุม snap ที่เปิดคอด้านหลัง",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
     file_path = os.path.abspath(f"bib_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Bib", size_label,
+    total_pages = tile_and_save(file_path, "ผ้ากันเปื้อน", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Bib pattern generated: {file_path}\n"

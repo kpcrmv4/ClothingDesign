@@ -80,10 +80,10 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         c.line(crotch[0] * cm, (crotch[1] + 1.5) * cm,
                waist_l[0] * cm, waist_l[1] * cm)
 
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawString((x0 + 1) * cm, (y0 + leg_length + rise * 0.5) * cm,
-                     f"Pants ({style}) - Cut 2 mirrored")
-        c.setFont("Helvetica", 7)
+                     f"Pants ({style}) - ตัด 2 ชิ้น mirrored")
+        c.setFont("Tahoma", 7)
         c.drawString((x0 + 1) * cm, (y0 + leg_length + rise * 0.4) * cm,
                      f"Size {size_label}  |  Rise {rise:.1f}cm  |  "
                      f"Leg {leg_length:.1f}cm")
@@ -109,29 +109,29 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         c.setStrokeColor(black)
 
     instructions = [
-        f"BABY {'LONG' if style == 'long' else 'SHORT'} PANTS - {size_label}",
+        f"กางเกง{'ขายาว' if style == 'long' else 'ขาสั้น'} - {size_label}",
         "",
-        "Materials:",
-        "  - 0.5 m knit or woven cotton of 115cm width",
-        "  - Matching thread",
-        "  - 2 cm wide elastic = child waist measurement - 2 cm",
+        "วัสดุ:",
+        "  - ผ้านิตหรือคอตตอนทอ 0.5 ม. กว้าง 115 ซม",
+        "  - ด้ายสีเข้มกับผ้า",
+        "  - ยางยืดกว้าง 2 ซม = รอบเอวเด็ก - 2 ซม",
         "",
-        "Sewing order:",
-        "  1. Cut 2 leg pieces (mirror images)",
-        "  2. Sew crotch seams RST (front to back) on both legs",
-        "  3. Turn one leg right side out, insert into the other leg RST",
-        "  4. Sew continuous inseam from cuff to cuff through crotch",
-        "  5. Fold waist 2.5 cm, sew casing with 3cm gap",
-        "  6. Thread elastic, overlap 1cm, sew closed",
-        "  7. Close casing gap, topstitch waist",
-        "  8. Hem cuffs 1.5 cm (or add cuff band)",
+        "ลำดับการเย็บ:",
+        "  1. ตัดขา 2 ชิ้น (ซ้ายขวา)",
+        "  2. เย็บตะเข็บเป้า ด้านในประกบใน (หน้ากับหลัง) ทั้งสองขา",
+        "  3. หมุนขาข้างหนึ่งให้ด้านหน้าออก ใส่เข้าไปในขาอีกข้าง ด้านในประกบใน",
+        "  4. เย็บตะเข็บด้านในต่อเนื่องจากข้อต่อขอ ผ่านเป้า",
+        "  5. พับเอว 2.5 ซม เย็บปลอกร้อยยาง เว้นช่องว่าง 3 ซม",
+        "  6. ใส่ยางยืด ทับซ้อน 1 ซม เย็บปิด",
+        "  7. ปิดช่องว่างปลอกร้อยยาง เย็บตามขอบเอว",
+        "  8. จบชายขา 1.5 ซม (หรือเพิ่มผ้าห่อข้อเท้า)",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
-        f"Style: {style}",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
+        f"ลักษณะ: {style}",
     ]
 
     file_path = os.path.abspath(f"pants_pattern_{size_label}_{style}.pdf")
-    total_pages = tile_and_save(file_path, f"Baby Pants ({style})", size_label,
+    total_pages = tile_and_save(file_path, f"กางเกงเด็ก ({style})", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Pants pattern generated: {file_path}\n"

@@ -68,14 +68,14 @@ def generate(size_label: str,
                            crotch_half, shoulder_drop, leg_drop, rise,
                            body_torso, total_h, sa)
 
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawString((bx + 1) * cm, (by + total_h * 0.6) * cm,
-                     "1. Body - Cut 2 on fold")
-        c.setFont("Helvetica", 8)
+                     "1. Body - ตัด 2 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 8)
         c.drawString((bx + 1) * cm, (by + total_h * 0.55) * cm,
                      f"Size {size_label}  |  "
                      f"Front + Back (identical)")
-        c.setFont("Helvetica", 7)
+        c.setFont("Tahoma", 7)
         c.drawString((bx + 1) * cm, (by + total_h * 0.50) * cm,
                      f"Top {top_half * 2:.1f}cm | Hip {hip_half * 2:.1f}cm "
                      f"| Length {total_h:.1f}cm")
@@ -103,14 +103,14 @@ def generate(size_label: str,
             snap_x = bx + 1 + i * snap_spacing
             c.circle(snap_x * cm, snap_y * cm, 0.2 * cm, fill=1, stroke=0)
         c.setFillColor(black)
-        c.setFont("Helvetica", 6)
+        c.setFont("Tahoma", 6)
         c.setFillColor(red)
         c.drawString((bx + 0.3) * cm, (by + 1.1) * cm,
                      f"{crotch_snaps} snaps at crotch (back piece only)")
         c.setFillColor(black)
 
         # elastic casing annotation at top
-        c.setFont("Helvetica-Oblique", 6)
+        c.setFont("Tahoma", 6)
         c.setFillColor(gray)
         c.drawString((bx + 0.3) * cm, (by + total_h - 0.35) * cm,
                      "fold 1.5cm for elastic casing")
@@ -129,14 +129,14 @@ def generate(size_label: str,
             c.rect(rx * cm, ry * cm,
                    ruffle_length_each * cm, ruffle_h * cm)
 
-            c.setFont("Helvetica-Bold", 10)
+            c.setFont("Tahoma-Bold", 10)
             if ruffle_strips == 1:
-                label = "2. Ruffle - Cut 1 strip"
+                label = "2. Ruffle - ตัด 1 ชิ้น strip"
             else:
                 label = f"2. Ruffle - Strip {strip_i + 1} of 2 (cut 1 each)"
             c.drawString((rx + 0.5) * cm,
                          (ry + ruffle_h - 0.7) * cm, label)
-            c.setFont("Helvetica", 7)
+            c.setFont("Tahoma", 7)
             c.drawString((rx + 0.5) * cm, (ry + ruffle_h - 1.3) * cm,
                          f"{ruffle_length_each:.1f} x {ruffle_h:.1f} cm  "
                          f"(gather top, fullness {ruffle_fullness}x)")
@@ -170,7 +170,7 @@ def generate(size_label: str,
     instructions = [
         f"OFF-SHOULDER FLUTTER ROMPER - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 0.6-0.9 m cotton lawn, poplin, or double gauze",
         "  - Matching thread",
         f"  - 5mm elastic: ~{top_half * 2 * 0.9:.0f} cm for neckline,",
@@ -182,8 +182,8 @@ def generate(size_label: str,
         "  the neckline and cascades over the shoulders as flutter sleeves.",
         "  Neckline stretches on/off over baby's head (elasticized).",
         "",
-        "Sewing order:",
-        "  1. Cut 2 body pieces on fold (front + back)",
+        "ลำดับการเย็บ:",
+        "  1. ตัด 2 ชิ้น body pieces on fold (front + back)",
         "  2. Cut ruffle strip(s); join if 2 strips to make one continuous loop",
         "  3. Sew side seams RST (front to back)",
         "  4. Hem ruffle bottom with 6mm narrow rolled hem",
@@ -197,13 +197,13 @@ def generate(size_label: str,
         f" 11. Install {crotch_snaps} snaps at crotch edge",
         " 12. Final press",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
         f"Ruffle height: {ruffle_height} cm  |  Fullness: {ruffle_fullness}x",
     ]
 
     file_path = os.path.abspath(f"flutter_romper_pattern_{size_label}.pdf")
     total_pages = tile_and_save(
-        file_path, "Off-Shoulder Flutter Romper", size_label,
+        file_path, "ชุดหมีคอระบาย", size_label,
         total_w, total_h_canvas, draw, instructions)
 
     return (f"Flutter romper pattern generated: {file_path}\n"

@@ -35,10 +35,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         bx, by = 2.0, y_cursor
         _draw_kimono_back(c, bx, by, chest_half, body_len,
                           neck_width, neck_drop_back, shoulder_w)
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((bx + 0.5) * cm, (by + body_len * 0.85) * cm,
-                     "1. Back - Cut 1 on fold")
-        c.setFont("Helvetica", 7)
+                     "1. Back - ตัด 1 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 7)
         c.drawString((bx + 0.5) * cm, (by + body_len * 0.8) * cm,
                      f"Size {size_label}  |  {chest_half:.1f} x {body_len:.1f}cm")
         draw_grain_line(c,
@@ -53,10 +53,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         fx, fy = 2.0, y_cursor
         _draw_kimono_front(c, fx, fy, chest_half, body_len,
                            neck_width, neck_drop_front, shoulder_w)
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((fx + 0.5) * cm, (fy + body_len * 0.85) * cm,
-                     "2. Front - Cut 2 (mirror)")
-        c.setFont("Helvetica", 7)
+                     "2. Front - ตัด 2 ชิ้น (mirror)")
+        c.setFont("Tahoma", 7)
         c.drawString((fx + 0.5) * cm, (fy + body_len * 0.8) * cm,
                      "Right front overlaps left at closure")
         draw_grain_line(c,
@@ -69,10 +69,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         # --- Sleeve (cut 2) ---
         sx, sy = 2.0, y_cursor
         _draw_sleeve(c, sx, sy, sleeve_cap_w, sleeve_len, sleeve_cuff)
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.85) * cm,
-                     "3. Sleeve - Cut 2")
-        c.setFont("Helvetica", 7)
+                     "3. Sleeve - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 7)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.78) * cm,
                      f"Cap {sleeve_cap_w:.1f}cm | Cuff {sleeve_cuff:.1f}cm "
                      f"| Length {sleeve_len:.1f}cm")
@@ -85,12 +85,12 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
     instructions = [
         f"KIMONO WRAP TOP - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 0.5-0.7 m of 115 cm cotton lawn, flannel, or jersey",
         "  - Matching thread + bias tape 1.5 m",
         "  - 2 small snaps OR 60 cm cotton ribbon for ties",
         "",
-        "Sewing order:",
+        "ลำดับการเย็บ:",
         "  1. Cut: 1 back on fold, 2 fronts mirrored, 2 sleeves",
         "  2. Sew back to fronts at shoulder seams, RST",
         "  3. Attach sleeves to armholes, matching notches",
@@ -99,11 +99,11 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  6. Hem sleeve cuffs and bottom",
         "  7. Attach inside tie + outside tie OR 2 snaps",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
     file_path = os.path.abspath(f"kimono_top_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Kimono Wrap Top", size_label,
+    total_pages = tile_and_save(file_path, "เสื้อป้ายผูกข้าง", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Kimono top pattern generated: {file_path}\n"

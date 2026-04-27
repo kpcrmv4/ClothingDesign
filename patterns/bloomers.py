@@ -66,14 +66,14 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         draw_fold_edge(c, waist_l[0], waist_l[1] - rise * 0.4,
                        waist_l[0], waist_l[1])
 
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawString((x0 + 2) * cm, (y0 + rise * 0.6) * cm,
-                     "Bloomers - Cut 2 on fold")
-        c.setFont("Helvetica", 8)
+                     "Bloomers - ตัด 2 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 8)
         c.drawString((x0 + 2) * cm, (y0 + rise * 0.55) * cm,
                      f"Size {size_label}  |  rise {rise:.1f}cm  |  "
                      f"waist {waist_half * 2:.1f}cm")
-        c.setFont("Helvetica", 7)
+        c.setFont("Tahoma", 7)
         c.drawString((x0 + 2) * cm, (y0 + rise * 0.5) * cm,
                      "Elastic casings: fold 1.5cm at waist + leg openings")
 
@@ -95,15 +95,15 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         c.setStrokeColor(black)
 
     instructions = [
-        f"BABY BLOOMERS / DIAPER COVER - {size_label}",
+        f"กางเกงใน Bloomers - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 0.5 m of 115cm knit or woven cotton",
         "  - 1 cm wide elastic: 2 x leg (approx. 30cm each) + 1 waist",
         "  - Waist elastic length = child's waist - 2 cm",
         "",
-        "Sewing order:",
-        "  1. Cut 2 pieces on fold (front + back identical)",
+        "ลำดับการเย็บ:",
+        "  1. ตัด 2 ชิ้น pieces on fold (front + back identical)",
         "  2. Sew crotch seams RST (front to back) on both sides",
         "  3. Sew inseam + leg curve as one continuous seam",
         "  4. Fold waist edge 1.5 cm, sew leaving 3cm gap",
@@ -111,11 +111,11 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  6. Fold each leg opening 1.2 cm, thread leg elastic",
         "  7. Overlap elastic ends 1 cm, sew securely",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
     file_path = os.path.abspath(f"bloomers_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Bloomers", size_label,
+    total_pages = tile_and_save(file_path, "กางเกงใน", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Bloomers pattern generated: {file_path}\n"

@@ -55,10 +55,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
                (cx + back_w / 2) * cm, cy_top * cm)
         draw_fold_edge(c, cx - back_w / 2, cy_top, cx + back_w / 2, cy_top)
 
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawCentredString(cx * cm, (cy_bottom + crown_h * 0.55) * cm,
-                            "1. Crown - Cut 2 on fold")
-        c.setFont("Helvetica", 7)
+                            "1. Crown - ตัด 2 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 7)
         c.drawCentredString(cx * cm, (cy_bottom + crown_h * 0.45) * cm,
                             f"face {face_w * 2:.1f}cm | back {back_w:.1f}cm | "
                             f"depth {crown_h:.1f}cm")
@@ -84,10 +84,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         c.line((bx + band_l) * cm, by * cm,
                (bx + band_l) * cm, (by + band_h) * cm)
 
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((bx + 0.5) * cm, (by + band_h * 0.6) * cm,
-                     "2. Brim Band - Cut 2")
-        c.setFont("Helvetica", 7)
+                     "2. Brim Band - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 7)
         c.drawString((bx + 0.5) * cm, (by + band_h * 0.3) * cm,
                      f"{band_l:.1f} x {band_h:.1f} cm  (interline for structure)")
         draw_grain_line(c,
@@ -102,10 +102,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         ty = y_cursor
         c.setLineWidth(1.3)
         c.rect(tx * cm, ty * cm, tie_l * cm, tie_w * cm)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Tahoma-Bold", 9)
         c.drawString((tx + 0.5) * cm, (ty + tie_w * 0.55) * cm,
-                     "3. Tie - Cut 2")
-        c.setFont("Helvetica", 7)
+                     "3. Tie - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 7)
         c.drawString((tx + 0.5) * cm, (ty + tie_w * 0.2) * cm,
                      f"{tie_l:.1f} x {tie_w:.1f} cm  (fold lengthwise, sew, turn)")
         draw_grain_line(c,
@@ -114,17 +114,17 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         draw_sa_rect_envelope(c, tx, ty, tie_l, tie_w, sa)
 
     instructions = [
-        f"BABY BONNET - {size_label}",
+        f"หมวก - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 0.3 m fashion fabric (quilting cotton, linen)",
         "  - 0.3 m lining (soft cotton lawn)",
         "  - 20 x 10 cm fusible interfacing (for brim)",
         "",
-        "Sewing order:",
-        "  1. Cut 2 crown pieces on fold (outer + lining)",
-        "  2. Cut 2 brim bands + 1 interfacing, fuse to one band",
-        "  3. Cut 2 ties",
+        "ลำดับการเย็บ:",
+        "  1. ตัด 2 ชิ้น crown pieces on fold (outer + lining)",
+        "  2. ตัด 2 ชิ้น brim bands + 1 interfacing, fuse to one band",
+        "  3. ตัด 2 ชิ้น ties",
         "  4. Make ties: fold lengthwise RST, sew, turn, press",
         "  5. Sandwich ties at front ends of brim band",
         "  6. Sew brim bands RST along curved top, turn, press",
@@ -132,11 +132,11 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  8. Attach crown to brim (outer fabric only)",
         "  9. Attach lining crown, turn through, hand-sew closing gap",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
     file_path = os.path.abspath(f"bonnet_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Bonnet", size_label,
+    total_pages = tile_and_save(file_path, "หมวก", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Bonnet pattern generated: {file_path}\n"

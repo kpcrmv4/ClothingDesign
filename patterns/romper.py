@@ -40,10 +40,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_romper_body(c, fx, fy, chest_half, bodice_h, rise, crotch_w,
                           neck_w, neck_drop, shoulder, armhole_w, armhole_drop,
                           leg_opening, "front")
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((fx + 0.5) * cm, (fy + bodice_h + rise * 0.1) * cm,
-                     "1. Front - Cut 1 on fold")
-        c.setFont("Helvetica", 7)
+                     "1. Front - ตัด 1 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 7)
         c.drawString((fx + 0.5) * cm, (fy + bodice_h + rise * 0.05) * cm,
                      f"Size {size_label}")
         draw_fold_edge(c, fx, fy, fx, fy + bodice_h + rise)
@@ -59,7 +59,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
             snap_x = fx + crotch_w * 0.3 + i * 1.3
             c.circle(snap_x * cm, (fy + 0.5) * cm, 0.15 * cm, fill=1)
         c.setFillColor(black)
-        c.setFont("Helvetica", 6)
+        c.setFont("Tahoma", 6)
         c.setFillColor(red)
         c.drawString((fx + crotch_w + 0.3) * cm, (fy + 0.3) * cm,
                      "3 snaps")
@@ -72,9 +72,9 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_romper_body(c, bx, by, chest_half, bodice_h, rise, crotch_w,
                           neck_w, neck_drop * 0.3, shoulder, armhole_w,
                           armhole_drop, leg_opening, "back")
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Tahoma-Bold", 10)
         c.drawString((bx + 0.5) * cm, (by + bodice_h + rise * 0.1) * cm,
-                     "2. Back - Cut 1 on fold")
+                     "2. Back - ตัด 1 ชิ้นบนรอยพับ")
         draw_fold_edge(c, bx, by, bx, by + bodice_h + rise)
         draw_grain_line(c,
                         bx + chest_half * 0.7, by + bodice_h * 0.3,
@@ -86,10 +86,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         sx, sy = 2.0, y_cursor
         c.setLineWidth(1.3)
         c.rect(sx * cm, sy * cm, strap_len * cm, strap_w * cm)
-        c.setFont("Helvetica-Bold", 9)
+        c.setFont("Tahoma-Bold", 9)
         c.drawString((sx + 0.5) * cm, (sy + strap_w * 0.55) * cm,
-                     "3. Strap - Cut 2")
-        c.setFont("Helvetica", 7)
+                     "3. Strap - ตัด 2 ชิ้น")
+        c.setFont("Tahoma", 7)
         c.drawString((sx + 0.5) * cm, (sy + strap_w * 0.2) * cm,
                      f"{strap_len:.1f} x {strap_w:.1f}cm  (fold, sew, turn)")
         draw_grain_line(c,
@@ -98,15 +98,15 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         draw_sa_rect_envelope(c, sx, sy, strap_len, strap_w, sa)
 
     instructions = [
-        f"BABY ROMPER - {size_label}",
+        f"ชุดหมี - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 0.7-0.9 m cotton lawn, double gauze, or light cotton",
         "  - Matching thread + 1 m bias tape",
         "  - 3 KAM snaps (crotch opening)",
         "  - 20 cm of 0.5cm elastic for leg openings",
         "",
-        "Sewing order:",
+        "ลำดับการเย็บ:",
         "  1. Cut: 1 front on fold, 1 back on fold, 2 straps",
         "  2. Make straps: fold RST, sew, turn, press",
         "  3. Sew side seams RST",
@@ -115,16 +115,16 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  6. Gather leg openings slightly + bind with bias",
         "  7. Install snaps at crotch (3 snaps along bottom edge)",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
     file_path = os.path.abspath(f"romper_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Romper", size_label,
+    total_pages = tile_and_save(file_path, "ชุดหมี", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Romper pattern generated: {file_path}\n"
             f"Size: {size_label}  |  Pages: {total_pages} A4 sheets\n"
-            f"Bodice {chest_half * 2:.1f}x{bodice_h:.1f}cm | "
+            f"ตัวเสื้อ {chest_half * 2:.1f}x{bodice_h:.1f}cm | "
             f"Rise {rise:.1f}cm")
 
 

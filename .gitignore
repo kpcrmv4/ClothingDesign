@@ -1,7 +1,22 @@
 __pycache__/
 *.pyc
 *.pyo
-*.pdf
 .venv/
 venv/
 .DS_Store
+
+# Generated files in project root (legacy drop spot — should be empty now)
+/dress_pattern_*.pdf
+/bloomers_pattern_*.pdf
+/bib_pattern_*.pdf
+/bonnet_pattern_*.pdf
+/kimono_top_pattern_*.pdf
+/pants_pattern_*.pdf
+/tshirt_pattern_*.pdf
+/romper_pattern_*.pdf
+/sleep_sack_pattern_*.pdf
+/flutter_romper_pattern_*.pdf
+/preview_*.png
+/cutting_layout_*.png
+
+# Track everything inside outputs/ (for GitHub Pages gallery)

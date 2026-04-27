@@ -119,8 +119,8 @@ def _preview_dress(spec):
     # fold edge color blue
     _draw_line_pil(draw, tx, x - 0.05, y, x - 0.05, y + bh,
                    color="blue", width=1, dashed=True)
-    draw.text(tx(x + 1, y + bh - 3), "Bodice", fill="black", font=label_font)
-    draw.text((10, 10), f"Baby Dress preview", fill="black", font=font)
+    draw.text(tx(x + 1, y + bh - 3), "ตัวเสื้อ", fill="black", font=label_font)
+    draw.text((10, 10), f"พรีวิวเดรสเด็ก", fill="black", font=font)
 
     return img
 
@@ -164,7 +164,7 @@ def _preview_bib(spec):
                      (cx + ow, top - nr * 0.3), (cx + ow, top),
                      (cx + ow, top), (cx + ow + 1.5, top - 1.0))
 
-    draw.text((10, 10), "Baby Bib preview", fill="black", font=font)
+    draw.text((10, 10), "พรีวิวผ้ากันเปื้อน", fill="black", font=font)
     return img
 
 
@@ -201,7 +201,7 @@ def _preview_bloomers(spec):
     _draw_line_pil(draw, tx, wl[0], wl[1] - rise * 0.4, wl[0], wl[1],
                    color="blue", width=1, dashed=True)
 
-    draw.text((10, 10), "Baby Bloomers preview", fill="black", font=font)
+    draw.text((10, 10), "พรีวิวกางเกง Bloomers", fill="black", font=font)
     return img
 
 
@@ -229,7 +229,7 @@ def _preview_bonnet(spec):
     _draw_line_pil(draw, tx, cx - bw / 2, ct, cx + bw / 2, ct,
                    color="blue", width=1, dashed=True)
 
-    draw.text((10, 10), "Baby Bonnet crown preview", fill="black", font=font)
+    draw.text((10, 10), "พรีวิวหมวกเด็ก", fill="black", font=font)
     return img
 
 
@@ -278,11 +278,11 @@ def _preview_flutter_romper(spec):
     _draw_line_pil(draw, tx, x, ruffle_y + ruffle_h * 0.4,
                    x + top_half, ruffle_y + ruffle_h * 0.4, color="gray")
 
-    draw.text((10, 10), "Flutter Romper preview", fill="black", font=font)
+    draw.text((10, 10), "พรีวิวชุดหมีคอระบาย", fill="black", font=font)
     draw.text(tx(x + 0.3, y + total_h * 0.3),
-              "body piece", fill="#555", font=sfont)
+              "ชิ้นตัว", fill="#555", font=sfont)
     draw.text(tx(x + 0.3, ruffle_y + 0.2),
-              "ruffle sketch (not to scale)", fill="#555", font=sfont)
+              "ระบาย (ไม่ตามสเกล)", fill="#555", font=sfont)
     return img
 
 
@@ -300,7 +300,7 @@ def _preview_generic_rect(title, w, h):
 
     draw.text((10, 10), title, fill="black", font=font)
     draw.text(tx(x + 0.3, y + h * 0.5),
-              f"approx. {w:.1f} x {h:.1f} cm", fill="gray", font=small)
+              f"ขนาดประมาณ {w:.1f} x {h:.1f} ซม", fill="gray", font=small)
     return img
 
 
@@ -321,23 +321,23 @@ def generate_preview(pattern_key: str, size_label: str) -> str:
     elif pattern_key == "kimono_top":
         w = spec["chest"] / 4 + 2.0
         h = spec["length"] * 0.9
-        img = _preview_generic_rect("Kimono Top (back piece)", w, h)
+        img = _preview_generic_rect("เสื้อป้ายผูกข้าง (หลัง)", w, h)
     elif pattern_key == "pants":
         w = spec["hip"] / 4 + 3.0
         h = spec["length"] * 1.15 + (spec["rise_f"] + spec["rise_b"]) / 2 + 3
-        img = _preview_generic_rect("Pants leg piece", w, h)
+        img = _preview_generic_rect("ขากางเกง", w, h)
     elif pattern_key == "tshirt":
         w = spec["chest"] / 4 + 2.5
         h = spec["length"] * 0.85
-        img = _preview_generic_rect("T-Shirt front", w, h)
+        img = _preview_generic_rect("เสื้อยืด (หน้า)", w, h)
     elif pattern_key == "romper":
         w = spec["chest"] / 4 + 2.0
         h = spec["length"] * 0.55 + (spec["rise_f"] + spec["rise_b"]) / 2 + 4
-        img = _preview_generic_rect("Romper front", w, h)
+        img = _preview_generic_rect("ชุดหมี (หน้า)", w, h)
     elif pattern_key == "sleep_sack":
         w = spec["chest"] / 4 + 12.0
         h = spec["length"] + 20.0
-        img = _preview_generic_rect("Sleep Sack back", w, h)
+        img = _preview_generic_rect("ถุงนอน (หลัง)", w, h)
     elif pattern_key == "flutter_romper":
         img = _preview_flutter_romper(spec)
     else:

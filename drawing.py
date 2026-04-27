@@ -5,12 +5,53 @@ All draw_* functions operate on reportlab Canvas in cm coordinates.
 tile_and_save() takes a draw callback and slices the virtual canvas into A4 pages.
 """
 import math
+import os
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib.colors import black, red, blue, gray
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 from constants import PAGE_MARGIN_CM, PRINTABLE_W_CM, PRINTABLE_H_CM
+
+
+# ============================================================
+# THAI FONT SETUP
+# ============================================================
+# Register a TTF that supports Thai glyphs so PDF labels render correctly.
+# Patterns reference the registered names via setFont("Tahoma", ...).
+THAI_FONT = "Tahoma"
+THAI_FONT_BOLD = "Tahoma-Bold"
+_FONT_REGISTERED = False
+
+
+def _register_thai_font():
+    global _FONT_REGISTERED
+    if _FONT_REGISTERED:
+        return
+    candidates = [
+        (r"C:\Windows\Fonts\tahoma.ttf",   r"C:\Windows\Fonts\tahomabd.ttf"),
+        (r"C:\Windows\Fonts\leelawad.ttf", r"C:\Windows\Fonts\leelawdb.ttf"),
+        ("/usr/share/fonts/truetype/tlwg/Loma.ttf",
+         "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf"),
+    ]
+    for reg_path, bold_path in candidates:
+        if not os.path.exists(reg_path):
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont(THAI_FONT, reg_path))
+            if os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(THAI_FONT_BOLD, bold_path))
+            else:
+                pdfmetrics.registerFont(TTFont(THAI_FONT_BOLD, reg_path))
+            _FONT_REGISTERED = True
+            return
+        except Exception:
+            continue
+
+
+_register_thai_font()
 
 
 def grid_ref(col: int, row: int) -> str:
@@ -42,8 +83,8 @@ def draw_grain_line(c, x1, y1, x2, y2):
     c.saveState()
     c.translate(mx * cm, my * cm)
     c.rotate(math.degrees(angle))
-    c.setFont("Helvetica", 7)
-    c.drawCentredString(0, 0.15 * cm, "GRAIN")
+    c.setFont(THAI_FONT, 7)
+    c.drawCentredString(0, 0.15 * cm, "เส้นใย")
     c.restoreState()
 
 
@@ -78,8 +119,8 @@ def draw_fold_edge(c, x1, y1, x2, y2):
     c.translate(mx * cm, my * cm)
     c.rotate(math.degrees(angle))
     c.setFillColor(blue)
-    c.setFont("Helvetica-Bold", 7)
-    c.drawCentredString(0, 0.2 * cm, "CUT ON FOLD")
+    c.setFont(THAI_FONT_BOLD, 7)
+    c.drawCentredString(0, 0.2 * cm, "ตัดบนรอยพับ")
     c.setFillColor(black)
     c.restoreState()
 
@@ -112,31 +153,31 @@ def draw_calibration(c, x=1.0, y=22.0):
     c.setStrokeColor(black)
     c.setLineWidth(1.0)
     c.rect(x * cm, y * cm, 5 * cm, 5 * cm)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString((x + 2.5) * cm, (y + 2.3) * cm, "5 x 5 cm")
-    c.setFont("Helvetica", 7)
+    c.setFont(THAI_FONT_BOLD, 10)
+    c.drawCentredString((x + 2.5) * cm, (y + 2.3) * cm, "5 x 5 ซม.")
+    c.setFont(THAI_FONT, 7)
     c.drawCentredString((x + 2.5) * cm, (y + 1.6) * cm,
-                        "Measure this square to verify print scale.")
+                        "วัดสี่เหลี่ยมนี้เพื่อตรวจสอบสเกลก่อนตัด")
 
     bar_y = y - 1.5
     c.line(x * cm, bar_y * cm, (x + 10) * cm, bar_y * cm)
     for i in range(11):
         tick_h = 0.4 if i % 5 == 0 else 0.2
         c.line((x + i) * cm, bar_y * cm, (x + i) * cm, (bar_y - tick_h) * cm)
-    c.setFont("Helvetica", 6)
+    c.setFont(THAI_FONT, 6)
     c.drawString(x * cm, (bar_y - 0.7) * cm, "0")
-    c.drawCentredString((x + 5) * cm, (bar_y - 0.7) * cm, "5 cm")
-    c.drawRightString((x + 10) * cm, (bar_y - 0.7) * cm, "10 cm")
+    c.drawCentredString((x + 5) * cm, (bar_y - 0.7) * cm, "5 ซม.")
+    c.drawRightString((x + 10) * cm, (bar_y - 0.7) * cm, "10 ซม.")
 
 
 def draw_page_header(c, title, size_label, ref, page_num, total_pages):
     """Top-of-page header bar with pattern info."""
-    c.setFont("Helvetica-Bold", 10)
+    c.setFont(THAI_FONT_BOLD, 10)
     c.setFillColor(black)
-    c.drawString(1 * cm, 28.8 * cm, f"{title}  |  Size: {size_label}")
-    c.setFont("Helvetica", 9)
+    c.drawString(1 * cm, 28.8 * cm, f"{title}  |  ไซส์: {size_label}")
+    c.setFont(THAI_FONT, 9)
     c.drawRightString(20 * cm, 28.8 * cm,
-                      f"Grid {ref}   Page {page_num}/{total_pages}")
+                      f"ช่อง {ref}   หน้า {page_num}/{total_pages}")
     c.setLineWidth(0.3)
     c.setStrokeColor(gray)
     c.line(1 * cm, 28.6 * cm, 20 * cm, 28.6 * cm)
@@ -168,7 +209,7 @@ def draw_registration_marks(c, col, row, cols, rows):
 
     if col < cols - 1:
         tri(20.5, 14.85, "right")
-        c.setFont("Helvetica", 6)
+        c.setFont(THAI_FONT, 6)
         c.drawString(20.1 * cm, 14.3 * cm, grid_ref(col + 1, row))
     if col > 0:
         tri(0.5, 14.85, "left")
@@ -189,10 +230,7 @@ def draw_registration_marks(c, col, row, cols, rows):
 # ============================================================
 def tile_and_save(output_path, title, size_label, total_w_cm, total_h_cm,
                   draw_fn, instructions=None):
-    """
-    Render draw_fn(c) on a virtual canvas sized (total_w_cm x total_h_cm),
-    sliced across A4 pages. draw_fn uses cm coordinates.
-    """
+    """Render draw_fn(c) on a virtual canvas sliced across A4 pages."""
     cols = max(1, math.ceil(total_w_cm / PRINTABLE_W_CM))
     rows = max(1, math.ceil(total_h_cm / PRINTABLE_H_CM))
     total_pattern_pages = cols * rows
@@ -245,20 +283,20 @@ def tile_and_save(output_path, title, size_label, total_w_cm, total_h_cm,
 
 def _draw_instruction_page(c, title, size_label, cols, rows, instructions):
     """Cover page with title, tiling info, sewing steps."""
-    c.setFont("Helvetica-Bold", 18)
+    c.setFont(THAI_FONT_BOLD, 18)
     c.drawString(2 * cm, 27 * cm, title)
-    c.setFont("Helvetica", 12)
-    c.drawString(2 * cm, 26 * cm, f"Size: {size_label}")
+    c.setFont(THAI_FONT, 12)
+    c.drawString(2 * cm, 26 * cm, f"ไซส์: {size_label}")
     c.drawString(2 * cm, 25.3 * cm,
-                 f"Tiling: {cols} columns x {rows} rows "
-                 f"= {cols * rows} A4 sheets")
+                 f"การต่อหน้า: {cols} คอลัมน์ x {rows} แถว "
+                 f"= {cols * rows} แผ่น A4")
 
     c.setLineWidth(0.5)
     c.line(2 * cm, 24.8 * cm, 19 * cm, 24.8 * cm)
 
-    c.setFont("Helvetica-Bold", 12)
-    c.drawString(2 * cm, 24 * cm, "Assembly & sewing notes")
-    c.setFont("Helvetica", 10)
+    c.setFont(THAI_FONT_BOLD, 12)
+    c.drawString(2 * cm, 24 * cm, "วิธีประกอบและเย็บ")
+    c.setFont(THAI_FONT, 10)
     y = 23.2
     for line in instructions:
         if y < 3:
@@ -267,7 +305,7 @@ def _draw_instruction_page(c, title, size_label, cols, rows, instructions):
         c.drawString(2 * cm, y * cm, line)
         y -= 0.55
 
-    c.setFont("Helvetica-Oblique", 9)
+    c.setFont(THAI_FONT, 9)
     c.drawString(2 * cm, 1.5 * cm,
-                 "Print at 100% scale (no 'fit to page'). "
-                 "Verify the 5x5cm square on page 1 before cutting.")
+                 "พิมพ์ที่สเกล 100% (ห้ามใช้ 'fit to page') "
+                 "ตรวจสอบสี่เหลี่ยม 5x5 ซม. ในหน้า 1 ก่อนเริ่มตัด")

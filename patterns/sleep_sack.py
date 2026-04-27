@@ -35,10 +35,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_sack_body(c, bx, by, chest_half, hem_half, total_len,
                         neck_w, neck_drop_back, shoulder,
                         armhole_w, armhole_drop)
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawString((bx + 1) * cm, (by + total_len * 0.5) * cm,
-                     "1. Back - Cut 1 on fold")
-        c.setFont("Helvetica", 7)
+                     "1. Back - ตัด 1 ชิ้นบนรอยพับ")
+        c.setFont("Tahoma", 7)
         c.drawString((bx + 1) * cm, (by + total_len * 0.45) * cm,
                      f"Size {size_label}")
         c.drawString((bx + 1) * cm, (by + total_len * 0.4) * cm,
@@ -58,10 +58,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_sack_body(c, fx, fy, chest_half, hem_half, total_len,
                         neck_w, neck_drop_front, shoulder,
                         armhole_w, armhole_drop)
-        c.setFont("Helvetica-Bold", 11)
+        c.setFont("Tahoma-Bold", 11)
         c.drawString((fx + 1) * cm, (fy + total_len * 0.5) * cm,
-                     "2. Front - Cut 2 (left + right)")
-        c.setFont("Helvetica", 7)
+                     "2. Front - ตัด 2 ชิ้น (left + right)")
+        c.setFont("Tahoma", 7)
         c.drawString((fx + 1) * cm, (fy + total_len * 0.45) * cm,
                      "Center front edge = zipper placement")
 
@@ -73,7 +73,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
                fx * cm, (fy + total_len - neck_drop_front) * cm)
         c.setDash([], 0)
         c.setStrokeColor(black)
-        c.setFont("Helvetica", 6)
+        c.setFont("Tahoma", 6)
         c.setFillColor(red)
         c.drawString((fx + 0.3) * cm, (fy + total_len - neck_drop_front - 0.6) * cm,
                      "ZIPPER (do NOT cut on fold)")
@@ -88,9 +88,9 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         draw_notch(c, fx, fy + 5, angle_deg=0)
 
     instructions = [
-        f"BABY SLEEP SACK - {size_label}",
+        f"ถุงนอน - {size_label}",
         "",
-        "Materials:",
+        "วัสดุ:",
         "  - 1.0-1.5 m cotton jersey, flannel, or muslin (main)",
         "  - 0.5 m backing for warmth (optional, cotton flannel)",
         "  - 1 separating zipper 35-50 cm (or matching length)",
@@ -101,7 +101,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  Do NOT add sleeves, hood, or loose accessories.",
         "  TOG value depends on fabric + filling; check local guidelines.",
         "",
-        "Sewing order:",
+        "ลำดับการเย็บ:",
         "  1. Cut: 1 back on fold, 2 fronts (mirror, center front NOT on fold)",
         "  2. Sew shoulder seams RST",
         "  3. Sew side seams RST",
@@ -110,11 +110,11 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         "  6. Hem bottom with 3cm double-fold hem",
         "  7. Optional: add backing layer before binding for warmth",
         "",
-        f"Seam allowance included: {seam_allowance} cm",
+        f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
     file_path = os.path.abspath(f"sleep_sack_pattern_{size_label}.pdf")
-    total_pages = tile_and_save(file_path, "Baby Sleep Sack", size_label,
+    total_pages = tile_and_save(file_path, "ถุงนอน", size_label,
                                  total_w, total_h, draw, instructions)
 
     return (f"Sleep sack pattern generated: {file_path}\n"
