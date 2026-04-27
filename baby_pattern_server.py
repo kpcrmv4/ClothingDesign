@@ -33,6 +33,7 @@ from patterns import kimono_top, pants, tshirt, romper, sleep_sack
 from patterns import flutter_romper
 import features
 import preview
+import rendered
 import cutting_layout
 import customize
 
@@ -121,6 +122,12 @@ def _run_pattern(pattern_key: str, size_label: str, gen_fn, *args,
                 preview_line = f"\nพรีวิว: {ppath}"
         except Exception as e:
             preview_line = f"\n(สร้างพรีวิวไม่สำเร็จ: {e})"
+        try:
+            rpath = rendered.render_finished(pattern_key, size_label)
+            if rpath and not rpath.startswith("Error"):
+                preview_line += f"\nภาพชุดเสร็จ: {rpath}"
+        except Exception as e:
+            preview_line += f"\n(วาดชุดเสร็จไม่สำเร็จ: {e})"
     finally:
         os.chdir(prev)
     try:
@@ -216,15 +223,78 @@ def _scan_runs():
         info = _parse_run_folder(entry)
         info["folder"] = entry
         info["pdfs"] = [f for f in files if f.endswith(".pdf")]
+        info["renders"] = [f for f in files if f.startswith("rendered_") and f.endswith(".png")]
         info["previews"] = [f for f in files if f.startswith("preview_") and f.endswith(".png")]
         info["layouts"] = [f for f in files if f.startswith("cutting_layout_") and f.endswith(".png")]
         info["other_pngs"] = [f for f in files
                                if f.endswith(".png")
                                and not f.startswith("preview_")
-                               and not f.startswith("cutting_layout_")]
-        info["all_files"] = files
+                               and not f.startswith("cutting_layout_")
+                               and not f.startswith("rendered_")
+                               and f != "index.html"]
+        info["all_files"] = [f for f in files if f != "index.html"]
         runs.append(info)
     return runs
+
+
+def _build_subfolder_index(folder: str, files: list) -> str:
+    """Per-folder index.html so GitHub Pages doesn't 404 when user clicks
+    the folder link."""
+    items = []
+    for f in sorted(files):
+        if f == "index.html":
+            continue
+        ext = f.rsplit(".", 1)[-1].lower()
+        if ext == "pdf":
+            icon = "📄"
+            preview_html = ""
+        elif ext == "png":
+            icon = "🖼"
+            preview_html = f'<img src="{escape(f)}" class="w-full max-w-xl rounded-lg shadow border" alt="{escape(f)}">'
+        else:
+            icon = "📎"
+            preview_html = ""
+        items.append(f'''<li class="bg-white rounded-xl shadow-sm p-4 space-y-3">
+  <a href="{escape(f)}" target="_blank" class="font-mono text-sm text-pink-600 hover:underline">{icon} {escape(f)}</a>
+  {preview_html}
+</li>''')
+    items_html = "\n".join(items) if items else '<li class="text-gray-400">โฟลเดอร์ว่าง</li>'
+    return f'''<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{escape(folder)} — Baby Fashion Engine</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>body {{ font-family: 'Sarabun', system-ui, sans-serif; }}</style>
+</head>
+<body class="bg-gradient-to-br from-pink-50 to-purple-50 min-h-screen">
+<div class="max-w-3xl mx-auto px-4 py-10">
+  <a href="../../index.html" class="inline-block mb-4 text-sm text-pink-600 hover:underline">← กลับไปแคตตาล็อก</a>
+  <h1 class="text-2xl font-bold text-gray-800 mb-2">📁 {escape(folder)}</h1>
+  <p class="text-sm text-gray-500 mb-6">{len(items)} ไฟล์</p>
+  <ul class="space-y-3">
+    {items_html}
+  </ul>
+</div>
+</body>
+</html>
+'''
+
+
+def _write_subfolder_indexes():
+    """Write index.html in every outputs/<run>/ subfolder."""
+    if not os.path.isdir(OUTPUTS_ROOT):
+        return
+    for entry in os.listdir(OUTPUTS_ROOT):
+        sub = os.path.join(OUTPUTS_ROOT, entry)
+        if not os.path.isdir(sub):
+            continue
+        files = [f for f in sorted(os.listdir(sub)) if f != "index.html"]
+        html = _build_subfolder_index(entry, files)
+        with open(os.path.join(sub, "index.html"), "w", encoding="utf-8") as f:
+            f.write(html)
 
 
 def _build_index_html(runs) -> str:
@@ -296,9 +366,18 @@ def _card_html(r: dict) -> str:
     ts_str = _format_ts(r["ts"]) if r["ts"] else ("ของเดิม" if r["legacy"] else "")
     legacy_badge = ('<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded">ของเดิม</span>'
                     if r["legacy"] else "")
-    preview_src = f"outputs/{escape(folder)}/{escape(r['previews'][0])}" if r["previews"] else ""
-    if preview_src:
-        thumb = f'<img src="{preview_src}" alt="preview" class="w-full h-56 object-contain bg-pink-50/60 p-4">'
+    # Prefer rendered (finished-garment illustration) over flat preview
+    thumb_src = ""
+    if r.get("renders"):
+        thumb_src = f"outputs/{escape(folder)}/{escape(r['renders'][0])}"
+    elif r["previews"]:
+        thumb_src = f"outputs/{escape(folder)}/{escape(r['previews'][0])}"
+    # Pick what to open when clicking the thumbnail — prefer PDF, else folder index
+    click_target = (f"outputs/{escape(folder)}/{escape(r['pdfs'][0])}"
+                     if r["pdfs"]
+                     else f"outputs/{escape(folder)}/index.html")
+    if thumb_src:
+        thumb = f'<img src="{thumb_src}" alt="preview" class="w-full h-56 object-cover bg-pink-50/60">'
     else:
         thumb = (f'<div class="w-full h-56 bg-pink-50/60 flex items-center justify-center text-5xl">'
                   f'{emoji}</div>')
@@ -328,7 +407,7 @@ def _card_html(r: dict) -> str:
 
     file_count = len(r["all_files"])
     return f"""<article class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition overflow-hidden border border-gray-100">
-  <a href="outputs/{escape(folder)}/" target="_blank" class="block">
+  <a href="{click_target}" target="_blank" class="block">
     {thumb}
   </a>
   <div class="p-5 space-y-3">
@@ -367,6 +446,10 @@ def _rebuild_index() -> str:
     html = _build_index_html(runs)
     with open(INDEX_HTML, "w", encoding="utf-8") as f:
         f.write(html)
+    try:
+        _write_subfolder_indexes()
+    except Exception:
+        pass
     return INDEX_HTML
 
 
