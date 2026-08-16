@@ -5,11 +5,13 @@ from reportlab.lib.colors import black, gray
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_bezier_edge,
-                     tile_and_save)
+                     tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
 def generate(size_label: str, seam_allowance: float = 1.0,
-             style: str = "long") -> str:
+             style: str = "long",
+             output_dir: str = ".") -> str:
     if style not in ("long", "short"):
         return f"Error: style must be 'long' or 'short', got '{style}'"
 
@@ -80,10 +82,10 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         c.line(crotch[0] * cm, (crotch[1] + 1.5) * cm,
                waist_l[0] * cm, waist_l[1] * cm)
 
-        c.setFont("Tahoma-Bold", 11)
+        c.setFont(THAI_FONT_BOLD, 11)
         c.drawString((x0 + 1) * cm, (y0 + leg_length + rise * 0.5) * cm,
                      f"Pants ({style}) - ตัด 2 ชิ้น mirrored")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((x0 + 1) * cm, (y0 + leg_length + rise * 0.4) * cm,
                      f"Size {size_label}  |  Rise {rise:.1f}cm  |  "
                      f"Leg {leg_length:.1f}cm")
@@ -130,7 +132,7 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         f"ลักษณะ: {style}",
     ]
 
-    file_path = os.path.abspath(f"pants_pattern_{size_label}_{style}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"pants_pattern_{size_label}_{style}.pdf"))
     total_pages = tile_and_save(file_path, f"กางเกงเด็ก ({style})", size_label,
                                  total_w, total_h, draw, instructions)
 

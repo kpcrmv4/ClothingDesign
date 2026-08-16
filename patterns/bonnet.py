@@ -5,10 +5,12 @@ from reportlab.lib.colors import black, gray
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save)
+                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
-def generate(size_label: str, seam_allowance: float = 1.0) -> str:
+def generate(size_label: str, seam_allowance: float = 1.0,
+             output_dir: str = ".") -> str:
     spec = get_size(size_label)
 
     face_w = spec["head"] / 2 - 2.0
@@ -55,10 +57,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
                (cx + back_w / 2) * cm, cy_top * cm)
         draw_fold_edge(c, cx - back_w / 2, cy_top, cx + back_w / 2, cy_top)
 
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawCentredString(cx * cm, (cy_bottom + crown_h * 0.55) * cm,
                             "1. Crown - ตัด 2 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawCentredString(cx * cm, (cy_bottom + crown_h * 0.45) * cm,
                             f"face {face_w * 2:.1f}cm | back {back_w:.1f}cm | "
                             f"depth {crown_h:.1f}cm")
@@ -84,10 +86,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         c.line((bx + band_l) * cm, by * cm,
                (bx + band_l) * cm, (by + band_h) * cm)
 
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((bx + 0.5) * cm, (by + band_h * 0.6) * cm,
                      "2. Brim Band - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((bx + 0.5) * cm, (by + band_h * 0.3) * cm,
                      f"{band_l:.1f} x {band_h:.1f} cm  (interline for structure)")
         draw_grain_line(c,
@@ -102,10 +104,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         ty = y_cursor
         c.setLineWidth(1.3)
         c.rect(tx * cm, ty * cm, tie_l * cm, tie_w * cm)
-        c.setFont("Tahoma-Bold", 9)
+        c.setFont(THAI_FONT_BOLD, 9)
         c.drawString((tx + 0.5) * cm, (ty + tie_w * 0.55) * cm,
                      "3. Tie - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((tx + 0.5) * cm, (ty + tie_w * 0.2) * cm,
                      f"{tie_l:.1f} x {tie_w:.1f} cm  (fold lengthwise, sew, turn)")
         draw_grain_line(c,
@@ -135,7 +137,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
-    file_path = os.path.abspath(f"bonnet_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"bonnet_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(file_path, "หมวก", size_label,
                                  total_w, total_h, draw, instructions)
 

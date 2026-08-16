@@ -5,11 +5,13 @@ from reportlab.lib.colors import black, gray, red
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save)
+                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
 def generate(size_label: str, seam_allowance: float = 1.0,
-             sleeve: str = "short") -> str:
+             sleeve: str = "short",
+             output_dir: str = ".") -> str:
     if sleeve not in ("short", "long"):
         return f"Error: sleeve must be 'short' or 'long', got '{sleeve}'"
 
@@ -43,10 +45,10 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         fx, fy = 2.0, y_cursor
         _draw_tshirt_body(c, fx, fy, chest_half, length,
                           neck_width, neck_drop_front, shoulder_w, armhole_drop)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((fx + 0.5) * cm, (fy + length * 0.85) * cm,
                      "1. Front - ตัด 1 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((fx + 0.5) * cm, (fy + length * 0.78) * cm,
                      f"Size {size_label}  |  {chest_half:.1f} x {length:.1f}cm")
         draw_grain_line(c,
@@ -68,16 +70,16 @@ def generate(size_label: str, seam_allowance: float = 1.0,
                (bx + neck_width + shoulder_w) * cm, (by + length) * cm)
         c.setDash([], 0)
         c.setStrokeColor(black)
-        c.setFont("Tahoma", 6)
+        c.setFont(THAI_FONT, 6)
         c.setFillColor(red)
         c.drawString((bx + neck_width) * cm, (by + length - 0.4) * cm,
                      "shoulder opening - 2-3 snaps")
         c.setFillColor(black)
 
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((bx + 0.5) * cm, (by + length * 0.85) * cm,
                      "2. Back - ตัด 1 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((bx + 0.5) * cm, (by + length * 0.78) * cm,
                      "Shallower neckline than front")
         draw_grain_line(c,
@@ -90,10 +92,10 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         # --- Sleeve ---
         sx, sy = 2.0, y_cursor
         _draw_sleeve_tshirt(c, sx, sy, sleeve_cap_w, sleeve_len, sleeve_cuff)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.85) * cm,
                      f"3. Sleeve ({sleeve}) - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.78) * cm,
                      f"Cap {sleeve_cap_w:.1f}cm | Len {sleeve_len:.1f}cm | "
                      f"Cuff {sleeve_cuff:.1f}cm")
@@ -115,10 +117,10 @@ def generate(size_label: str, seam_allowance: float = 1.0,
                (nx + neckband_l) * cm, (ny + neckband_h / 2) * cm)
         c.setDash([], 0)
         c.setStrokeColor(black)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((nx + 0.5) * cm, (ny + neckband_h - 1) * cm,
                      "4. Neckband - ตัด 1 ชิ้น ribbing (knit)")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((nx + 0.5) * cm, (ny + 0.3) * cm,
                      f"{neckband_l:.1f} x {neckband_h:.1f}cm  "
                      f"(stretch to fit neckline, fold in half lengthwise)")
@@ -148,7 +150,7 @@ def generate(size_label: str, seam_allowance: float = 1.0,
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
-    file_path = os.path.abspath(f"tshirt_pattern_{size_label}_{sleeve}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"tshirt_pattern_{size_label}_{sleeve}.pdf"))
     total_pages = tile_and_save(file_path, f"เสื้อยืดเด็ก ({sleeve})", size_label,
                                  total_w, total_h, draw, instructions)
 

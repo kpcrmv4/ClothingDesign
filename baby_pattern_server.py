@@ -1,608 +1,371 @@
 """
-Baby Fashion Engine - MCP Server for children's clothing patterns (0-24m).
+Baby Fashion Engine — MCP server for children's clothing patterns (0-24m).
 
-Entry point: thin layer over the `patterns/` and `features` modules.
-All tools return human-readable strings (with file paths for PDF/PNG output).
+Entry point only: tool definitions plus the run/publish plumbing. The work
+lives in the modules next to this file.
+
+    geometry.py   ขนาดชิ้นทุกแพทเทิร์น (แหล่งความจริงเดียว)
+    patterns/     วาดแพทเทิร์นลง PDF
+    preview.py    PNG รูปทรงชิ้นแบน
+    rendered.py   PNG ภาพชุดเมื่อเย็บเสร็จ
+    cutting_layout.py  PNG ผังวางบนผ้า
+    features.py   metadata + คำนวณผ้า + รายการซื้อของ
+    customize.py  ตีความคำบรรยาย -> แพทเทิร์น + พารามิเตอร์
+    gallery.py    จัดการโฟลเดอร์ outputs/ และสร้าง index.html
 
 Run:
-    pip install mcp reportlab Pillow
+    pip install -r requirements.txt
     cd <project_folder>
     python baby_pattern_server.py
 """
+import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from datetime import datetime
-from html import escape
 
-# Force cwd to this script's folder so all generated PDF/PNG land here.
-# Claude Desktop on Windows ignores the `cwd` config field and launches
-# MCP servers from C:\Windows\System32, which would otherwise pollute that
-# folder (and require admin rights). Pin output to the project folder.
+# Claude Desktop on Windows ignores the `cwd` config field and launches MCP
+# servers from C:\Windows\System32. Pin sys.path to this folder so the local
+# modules import; generated files are addressed by explicit output_dir, never
+# by the process cwd.
 _HERE = os.path.dirname(os.path.abspath(__file__))
-os.chdir(_HERE)
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
 
-from mcp.server.fastmcp import FastMCP
+try:                        # MCP SDK 1.x
+    from mcp.server.fastmcp import FastMCP as _Server
+except ImportError:         # MCP SDK 2.x renamed FastMCP -> MCPServer
+    from mcp.server import MCPServer as _Server
 
-from patterns import dress, bib, bloomers, bonnet
-from patterns import kimono_top, pants, tshirt, romper, sleep_sack
-from patterns import flutter_romper
-import features
-import preview
-import rendered
 import cutting_layout
 import customize
+import drawing
+import features
+import gallery
+import preview
+import rendered
+from patterns import (dress, tiered_dress, bib, bloomers, bonnet,
+                      kimono_top, pants, tshirt, romper, sleep_sack,
+                      flutter_romper)
+from sizes import SIZE_CHART
+
+CONFIG_PATH = os.path.join(_HERE, ".engine_config.json")
+DEFAULT_CONFIG = {"auto_publish": True, "allow_publish_to_default_branch": False}
+_PROTECTED_BRANCHES = {"main", "master"}
+
+
+def _load_config() -> dict:
+    cfg = dict(DEFAULT_CONFIG)
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            cfg.update(json.load(f))
+    except (OSError, ValueError):
+        pass
+    return cfg
+
+
+def _save_config(cfg: dict):
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except OSError:
+        pass
+
 
 # ============================================================
-# OUTPUT MANAGEMENT — per-call subfolders + auto index.html
+# RUN WRAPPERS
 # ============================================================
-OUTPUTS_ROOT = os.path.join(_HERE, "outputs")
-INDEX_HTML = os.path.join(_HERE, "index.html")
-
-PATTERN_TITLES = {
-    "dress": "เดรสเด็ก",
-    "bib": "ผ้ากันเปื้อน",
-    "bloomers": "กางเกงใน Bloomers",
-    "bonnet": "หมวกเด็ก",
-    "kimono_top": "เสื้อป้ายผูกข้าง",
-    "pants": "กางเกงเอวยางยืด",
-    "tshirt": "เสื้อยืดเด็ก",
-    "romper": "ชุดหมีเด็ก",
-    "sleep_sack": "ถุงนอนเด็ก",
-    "flutter_romper": "ชุดหมีคอระบาย",
-    "preview": "พรีวิว",
-    "layout": "ผังตัด",
-    "misc": "อื่น ๆ",
-}
-
-PATTERN_EMOJI = {
-    "dress": "👗", "bib": "🧷", "bloomers": "🩲", "bonnet": "👒",
-    "kimono_top": "🥋", "pants": "👖", "tshirt": "👕", "romper": "👶",
-    "sleep_sack": "😴", "flutter_romper": "🌸", "misc": "🧵",
-}
+def _size_error(size_label: str) -> str:
+    return (f"❌ ไม่พบไซส์ '{size_label}'\n"
+            f"ไซส์ที่ใช้ได้: {', '.join(SIZE_CHART)}\n"
+            f"(เรียก list_available_sizes เพื่อดูสัดส่วนแต่ละไซส์)")
 
 
-def _safe(s: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_.-]", "_", str(s))
+def _run_pattern(pattern_key: str, size_label: str, gen_fn,
+                 label_extra: str = "", render_params: dict = None,
+                 **kwargs) -> str:
+    """Generate PDF + preview + finished-garment PNG into one fresh folder.
 
+    Any failure becomes a readable message rather than a traceback, because
+    the user only ever sees the returned string inside Claude.
+    """
+    if size_label not in SIZE_CHART:
+        return _size_error(size_label)
 
-def _make_run_dir(label: str) -> str:
-    """Create outputs/<label>_<timestamp>/ and return its absolute path."""
-    os.makedirs(OUTPUTS_ROOT, exist_ok=True)
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    base = os.path.join(OUTPUTS_ROOT, f"{_safe(label)}_{ts}")
-    sub = base
-    n = 1
-    while os.path.exists(sub):
-        n += 1
-        sub = f"{base}_{n}"
-    os.makedirs(sub)
-    return sub
-
-
-def _run_in_subdir(label: str, fn, *args, **kwargs):
-    """Run a file-producing function with cwd pinned to a fresh subfolder.
-    Then rebuild the gallery index.html so the new run shows up."""
-    sub = _make_run_dir(label)
-    prev = os.getcwd()
-    try:
-        os.chdir(sub)
-        result = fn(*args, **kwargs)
-    finally:
-        os.chdir(prev)
-    try:
-        _rebuild_index()
-    except Exception:
-        pass  # never let an index error mask a successful generation
-    return result
-
-
-def _run_pattern(pattern_key: str, size_label: str, gen_fn, *args,
-                  label_extra: str = "", **kwargs):
-    """Generate a pattern PDF + preview PNG into the same fresh subfolder,
-    rebuild the index, and (if AUTO_PUBLISH) push to GitHub. Returns the
-    PDF generator's text result with status lines appended."""
+    render_params = render_params or {}
     label = f"{pattern_key}_{size_label}"
     if label_extra:
         label += f"_{label_extra}"
-    sub = _make_run_dir(label)
-    prev = os.getcwd()
-    pdf_result = ""
-    preview_line = ""
+
     try:
-        os.chdir(sub)
-        pdf_result = gen_fn(*args, **kwargs)
-        try:
-            ppath = preview.generate_preview(pattern_key, size_label)
-            if ppath and not ppath.startswith("Error"):
-                preview_line = f"\nพรีวิว: {ppath}"
-        except Exception as e:
-            preview_line = f"\n(สร้างพรีวิวไม่สำเร็จ: {e})"
-        try:
-            rpath = rendered.render_finished(pattern_key, size_label)
-            if rpath and not rpath.startswith("Error"):
-                preview_line += f"\nภาพชุดเสร็จ: {rpath}"
-        except Exception as e:
-            preview_line += f"\n(วาดชุดเสร็จไม่สำเร็จ: {e})"
-    finally:
-        os.chdir(prev)
+        sub = gallery.make_run_dir(label)
+    except OSError as e:
+        return f"❌ สร้างโฟลเดอร์ผลลัพธ์ไม่สำเร็จ: {e}"
+
     try:
-        _rebuild_index()
+        pdf_result = gen_fn(size_label, output_dir=sub, **kwargs)
+    except Exception as e:
+        return (f"❌ สร้างแพทเทิร์น {pattern_key} ไม่สำเร็จ: "
+                f"{type(e).__name__}: {e}\n"
+                f"ลองตรวจไซส์และพารามิเตอร์ หรือเรียก list_all_patterns "
+                f"เพื่อดูตัวเลือกที่ถูกต้อง")
+
+    if isinstance(pdf_result, str) and pdf_result.startswith("Error"):
+        return f"❌ {pdf_result}"
+
+    extra_lines = []
+    try:
+        p = preview.generate_preview(pattern_key, size_label,
+                                     output_dir=sub, **render_params)
+        if p and not p.startswith("Error"):
+            extra_lines.append(f"พรีวิว: {p}")
+    except Exception as e:
+        extra_lines.append(f"(สร้างพรีวิวไม่สำเร็จ: {e})")
+
+    try:
+        r = rendered.render_finished(pattern_key, size_label,
+                                     output_dir=sub, **render_params)
+        if r and not r.startswith("Error"):
+            extra_lines.append(f"ภาพชุดเสร็จ: {r}")
+    except Exception as e:
+        extra_lines.append(f"(วาดชุดเสร็จไม่สำเร็จ: {e})")
+
+    warn = drawing.font_warning()
+    if warn:
+        extra_lines.append(f"⚠ {warn}")
+
+    try:
+        gallery.rebuild_index()
+        extra_lines.append(
+            f"แคตตาล็อก: file:///{gallery.INDEX_HTML.replace(os.sep, '/')}")
+    except Exception as e:
+        extra_lines.append(f"(สร้างแคตตาล็อกไม่สำเร็จ: {e})")
+
+    cfg = _load_config()
+    if cfg["auto_publish"]:
+        title = features.PATTERN_META.get(pattern_key, {}).get(
+            "title_th", pattern_key)
+        tag = f"{title} {size_label}"
+        if label_extra:
+            tag += f" ({label_extra})"
+        res = _publish(f"เพิ่ม {tag} — {datetime.now().strftime('%H:%M')}")
+        extra_lines.append("")
+        extra_lines.append(res["summary"])
+
+    return pdf_result + "\n" + "\n".join(extra_lines)
+
+
+def _run_file_tool(label: str, fn, *args, **kwargs) -> str:
+    """Run a single file-producing helper into its own folder."""
+    try:
+        sub = gallery.make_run_dir(label)
+        path = fn(*args, output_dir=sub, **kwargs)
+    except Exception as e:
+        return f"❌ ทำงานไม่สำเร็จ: {type(e).__name__}: {e}"
+    if isinstance(path, str) and path.startswith("Error"):
+        return f"❌ {path}"
+    try:
+        gallery.rebuild_index()
     except Exception:
         pass
-    gallery_line = f"\nแคตตาล็อก: file:///{INDEX_HTML.replace(os.sep, '/')}"
-
-    # Auto-publish to GitHub Pages if enabled
-    publish_line = ""
-    if AUTO_PUBLISH:
-        try:
-            title = PATTERN_TITLES.get(pattern_key, pattern_key)
-            tag = f"{title} {size_label}"
-            if label_extra:
-                tag += f" ({label_extra})"
-            ts = datetime.now().strftime("%H:%M")
-            commit_msg = f"เพิ่ม {tag} — {ts}"
-            res = _publish(commit_msg)
-            publish_line = f"\n\n{res['summary']}"
-        except Exception as e:
-            publish_line = f"\n\n⚠ auto-publish skipped: {e}"
-
-    return f"{pdf_result}{preview_line}{gallery_line}{publish_line}"
+    return f"✓ บันทึกแล้ว: {path}"
 
 
-def _migrate_loose_root_files():
-    """Move any pattern-shaped files in the project root into
-    outputs/legacy_<key>_<size>/ so the gallery can pick them up.
-    Runs once at startup; safe to re-run."""
-    if not os.path.isdir(_HERE):
-        return []
-    moved = []
-    for fn in list(os.listdir(_HERE)):
-        full = os.path.join(_HERE, fn)
-        if not os.path.isfile(full):
-            continue
-        if not (fn.endswith(".pdf") or fn.endswith(".png")):
-            continue
-        m1 = re.match(r"^([a-z_]+?)_pattern_(\d+-\d+m)", fn)
-        m2 = re.match(r"^preview_([a-z_]+?)_(\d+-\d+m)", fn)
-        m3 = re.match(r"^cutting_layout_([a-z_]+?)_(\d+-\d+m)_", fn)
-        key = size = None
-        for m in (m1, m2, m3):
-            if m:
-                key, size = m.group(1), m.group(2)
-                break
-        if not key:
-            continue
-        sub = os.path.join(OUTPUTS_ROOT, f"legacy_{_safe(key)}_{_safe(size)}")
-        os.makedirs(sub, exist_ok=True)
-        try:
-            shutil.move(full, os.path.join(sub, fn))
-            moved.append(fn)
-        except Exception:
-            pass
-    return moved
-
-
-def _parse_run_folder(name: str) -> dict:
-    """Parse 'dress_3-6m_20260427-120530' or 'legacy_dress_3-6m' into parts."""
-    is_legacy = name.startswith("legacy_")
-    rest = name[len("legacy_"):] if is_legacy else name
-    m = re.match(r"^(.+?)_(\d+-\d+m)(?:_(\d{8}-\d{6})(?:_(\d+))?)?$", rest)
-    if m:
-        key = m.group(1)
-        size = m.group(2)
-        ts = m.group(3)
-    else:
-        key, size, ts = rest, "?", None
-    return {"key": key, "size": size, "ts": ts, "legacy": is_legacy}
-
-
-def _format_ts(ts: str) -> str:
-    if not ts:
-        return ""
-    try:
-        dt = datetime.strptime(ts, "%Y%m%d-%H%M%S")
-        return dt.strftime("%d %b %Y · %H:%M:%S")
-    except Exception:
-        return ts
-
-
-def _scan_runs():
-    runs = []
-    if not os.path.isdir(OUTPUTS_ROOT):
-        return runs
-    for entry in sorted(os.listdir(OUTPUTS_ROOT), reverse=True):
-        sub = os.path.join(OUTPUTS_ROOT, entry)
-        if not os.path.isdir(sub):
-            continue
-        files = sorted(os.listdir(sub))
-        info = _parse_run_folder(entry)
-        info["folder"] = entry
-        info["pdfs"] = [f for f in files if f.endswith(".pdf")]
-        info["renders"] = [f for f in files if f.startswith("rendered_") and f.endswith(".png")]
-        info["previews"] = [f for f in files if f.startswith("preview_") and f.endswith(".png")]
-        info["layouts"] = [f for f in files if f.startswith("cutting_layout_") and f.endswith(".png")]
-        info["other_pngs"] = [f for f in files
-                               if f.endswith(".png")
-                               and not f.startswith("preview_")
-                               and not f.startswith("cutting_layout_")
-                               and not f.startswith("rendered_")
-                               and f != "index.html"]
-        info["all_files"] = [f for f in files if f != "index.html"]
-        runs.append(info)
-    return runs
-
-
-def _build_subfolder_index(folder: str, files: list) -> str:
-    """Per-folder index.html so GitHub Pages doesn't 404 when user clicks
-    the folder link."""
-    items = []
-    for f in sorted(files):
-        if f == "index.html":
-            continue
-        ext = f.rsplit(".", 1)[-1].lower()
-        if ext == "pdf":
-            icon = "📄"
-            preview_html = ""
-        elif ext == "png":
-            icon = "🖼"
-            preview_html = f'<img src="{escape(f)}" class="w-full max-w-xl rounded-lg shadow border" alt="{escape(f)}">'
-        else:
-            icon = "📎"
-            preview_html = ""
-        items.append(f'''<li class="bg-white rounded-xl shadow-sm p-4 space-y-3">
-  <a href="{escape(f)}" target="_blank" class="font-mono text-sm text-pink-600 hover:underline">{icon} {escape(f)}</a>
-  {preview_html}
-</li>''')
-    items_html = "\n".join(items) if items else '<li class="text-gray-400">โฟลเดอร์ว่าง</li>'
-    return f'''<!doctype html>
-<html lang="th">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escape(folder)} — Baby Fashion Engine</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>body {{ font-family: 'Sarabun', system-ui, sans-serif; }}</style>
-</head>
-<body class="bg-gradient-to-br from-pink-50 to-purple-50 min-h-screen">
-<div class="max-w-3xl mx-auto px-4 py-10">
-  <a href="../../index.html" class="inline-block mb-4 text-sm text-pink-600 hover:underline">← กลับไปแคตตาล็อก</a>
-  <h1 class="text-2xl font-bold text-gray-800 mb-2">📁 {escape(folder)}</h1>
-  <p class="text-sm text-gray-500 mb-6">{len(items)} ไฟล์</p>
-  <ul class="space-y-3">
-    {items_html}
-  </ul>
-</div>
-</body>
-</html>
-'''
-
-
-def _write_subfolder_indexes():
-    """Write index.html in every outputs/<run>/ subfolder."""
-    if not os.path.isdir(OUTPUTS_ROOT):
-        return
-    for entry in os.listdir(OUTPUTS_ROOT):
-        sub = os.path.join(OUTPUTS_ROOT, entry)
-        if not os.path.isdir(sub):
-            continue
-        files = [f for f in sorted(os.listdir(sub)) if f != "index.html"]
-        html = _build_subfolder_index(entry, files)
-        with open(os.path.join(sub, "index.html"), "w", encoding="utf-8") as f:
-            f.write(html)
-
-
-def _build_index_html(runs) -> str:
-    cards_html = "\n".join(_card_html(r) for r in runs) if runs else _empty_state_html()
-    total = len(runs)
-    pattern_counts = {}
-    for r in runs:
-        k = r["key"]
-        pattern_counts[k] = pattern_counts.get(k, 0) + 1
-    chips = " ".join(
-        f'<span class="px-3 py-1 bg-pink-100 text-pink-700 text-xs rounded-full font-medium">'
-        f'{PATTERN_EMOJI.get(k, "🧵")} {escape(PATTERN_TITLES.get(k, k))} · {n}</span>'
-        for k, n in sorted(pattern_counts.items())
-    )
-    now = datetime.now().strftime("%d/%m/%Y · %H:%M")
-    run_word = "รอบ" if total != 1 else "รอบ"
-    return f"""<!doctype html>
-<html lang="th">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Baby Fashion Engine — แคตตาล็อกแพทเทิร์น</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  body {{ font-family: 'Sarabun', 'Noto Sans Thai', system-ui, sans-serif; }}
-  .grain {{ background-image: radial-gradient(circle at 1px 1px, rgba(0,0,0,0.04) 1px, transparent 0); background-size: 16px 16px; }}
-</style>
-</head>
-<body class="bg-gradient-to-br from-pink-50 via-white to-purple-50 min-h-screen grain">
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-  <header class="mb-10">
-    <div class="flex items-baseline justify-between flex-wrap gap-2">
-      <h1 class="text-4xl font-bold tracking-tight text-gray-800">
-        <span class="text-pink-500">🌸</span> Baby Fashion Engine
-      </h1>
-      <span class="text-sm text-gray-400">อัปเดตล่าสุด {escape(now)}</span>
-    </div>
-    <p class="mt-2 text-gray-500">แคตตาล็อกแพทเทิร์นเสื้อผ้าเด็ก · อัปเดตอัตโนมัติทุกครั้งที่สั่งสร้าง · คลิกการ์ดเพื่อเปิดไฟล์</p>
-    <div class="mt-4 flex flex-wrap gap-2">
-      <span class="px-3 py-1 bg-gray-900 text-white text-xs rounded-full font-medium">{total} {run_word}</span>
-      {chips}
-    </div>
-    <button onclick="location.reload()" class="mt-4 inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-gray-200 hover:border-pink-300 hover:bg-pink-50 text-xs text-gray-600 rounded-full transition">
-      🔄 รีเฟรชหน้านี้
-    </button>
-  </header>
-  <main class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-    {cards_html}
-  </main>
-  <footer class="mt-16 text-center text-xs text-gray-400">
-    สร้างโดย <code class="font-mono text-gray-500">baby_pattern_server.py</code> ·
-    ไฟล์ทั้งหมดอยู่ใน <code class="font-mono text-gray-500">outputs/</code>
-  </footer>
-</div>
-</body>
-</html>
-"""
-
-
-def _card_html(r: dict) -> str:
-    folder = r["folder"]
-    key = r["key"]
-    size = r["size"]
-    title = PATTERN_TITLES.get(key, key.replace("_", " ").title())
-    emoji = PATTERN_EMOJI.get(key, "🧵")
-    ts_str = _format_ts(r["ts"]) if r["ts"] else ("ของเดิม" if r["legacy"] else "")
-    legacy_badge = ('<span class="px-2 py-0.5 bg-amber-100 text-amber-700 text-[10px] rounded">ของเดิม</span>'
-                    if r["legacy"] else "")
-    # Prefer rendered (finished-garment illustration) over flat preview
-    thumb_src = ""
-    if r.get("renders"):
-        thumb_src = f"outputs/{escape(folder)}/{escape(r['renders'][0])}"
-    elif r["previews"]:
-        thumb_src = f"outputs/{escape(folder)}/{escape(r['previews'][0])}"
-    # Pick what to open when clicking the thumbnail — prefer PDF, else folder index
-    click_target = (f"outputs/{escape(folder)}/{escape(r['pdfs'][0])}"
-                     if r["pdfs"]
-                     else f"outputs/{escape(folder)}/index.html")
-    if thumb_src:
-        thumb = f'<img src="{thumb_src}" alt="preview" class="w-full h-56 object-cover bg-pink-50/60">'
-    else:
-        thumb = (f'<div class="w-full h-56 bg-pink-50/60 flex items-center justify-center text-5xl">'
-                  f'{emoji}</div>')
-
-    btns = []
-    for f in r["pdfs"]:
-        btns.append(
-            f'<a href="outputs/{escape(folder)}/{escape(f)}" target="_blank" '
-            f'class="px-3 py-1.5 bg-pink-500 hover:bg-pink-600 text-white text-xs rounded-full '
-            f'font-medium transition shadow-sm">📄 PDF</a>')
-    for f in r["layouts"]:
-        btns.append(
-            f'<a href="outputs/{escape(folder)}/{escape(f)}" target="_blank" '
-            f'class="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-800 text-xs '
-            f'rounded-full font-medium transition">📐 ผังตัด</a>')
-    for f in r["previews"]:
-        btns.append(
-            f'<a href="outputs/{escape(folder)}/{escape(f)}" target="_blank" '
-            f'class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs '
-            f'rounded-full font-medium transition">🖼 พรีวิว</a>')
-    for f in r["other_pngs"]:
-        btns.append(
-            f'<a href="outputs/{escape(folder)}/{escape(f)}" target="_blank" '
-            f'class="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs '
-            f'rounded-full font-medium transition">🖼 {escape(f)}</a>')
-    btns_html = "\n      ".join(btns) if btns else '<span class="text-xs text-gray-400">ไม่มีไฟล์</span>'
-
-    file_count = len(r["all_files"])
-    return f"""<article class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition overflow-hidden border border-gray-100">
-  <a href="{click_target}" target="_blank" class="block">
-    {thumb}
-  </a>
-  <div class="p-5 space-y-3">
-    <div class="flex items-baseline justify-between gap-2">
-      <h3 class="font-semibold text-gray-800 truncate">{emoji} {escape(title)}</h3>
-      <span class="text-xs font-mono text-pink-600 bg-pink-50 px-2 py-0.5 rounded">{escape(size)}</span>
-    </div>
-    <div class="flex items-center gap-2 text-xs text-gray-400">
-      <span>{escape(ts_str)}</span>
-      {legacy_badge}
-      <span class="ml-auto">{file_count} ไฟล์</span>
-    </div>
-    <div class="pt-1 flex flex-wrap gap-2">
-      {btns_html}
-    </div>
-    <details class="text-xs text-gray-500">
-      <summary class="cursor-pointer hover:text-gray-700">📁 {escape(folder)}</summary>
-      <ul class="mt-2 pl-3 space-y-0.5 font-mono text-[11px]">
-        {''.join(f'<li>· {escape(f)}</li>' for f in r['all_files'])}
-      </ul>
-    </details>
-  </div>
-</article>"""
-
-
-def _empty_state_html() -> str:
-    return """<div class="col-span-full bg-white rounded-2xl shadow-sm border border-dashed border-gray-200 p-12 text-center">
-  <div class="text-6xl mb-4">🌸</div>
-  <h2 class="text-xl font-semibold text-gray-700">ยังไม่มีแพทเทิร์นในแคตตาล็อก</h2>
-  <p class="mt-2 text-sm text-gray-500">ลองสั่ง Claude ว่า <code class="px-2 py-1 bg-gray-100 rounded font-mono text-pink-600">สร้างแพทเทิร์นเดรสไซส์ 3-6 เดือน</code></p>
-</div>"""
-
-
-def _rebuild_index() -> str:
-    runs = _scan_runs()
-    html = _build_index_html(runs)
-    with open(INDEX_HTML, "w", encoding="utf-8") as f:
-        f.write(html)
-    try:
-        _write_subfolder_indexes()
-    except Exception:
-        pass
-    return INDEX_HTML
-
-
-# Run startup tasks
-_migrate_loose_root_files()
+# Startup housekeeping
+gallery.migrate_loose_root_files()
 try:
-    _rebuild_index()
+    gallery.rebuild_index()
 except Exception:
     pass
 
 
-# ============================================================
-# MCP server
-# ============================================================
-mcp = FastMCP("BabyFashionEngine_Complete")
+mcp = _Server("BabyFashionEngine_Complete")
 
 
 # ============================================================
-# PATTERN GENERATORS (file-producing — wrapped in subfolders)
+# PATTERN GENERATORS
 # ============================================================
 @mcp.tool()
 def generate_full_dress_pattern(size_label: str,
-                                 seam_allowance: float = 1.0) -> str:
-    """Generate a sleeveless baby dress with gathered ruffle hem.
+                                seam_allowance: float = 1.0,
+                                skirt_style: str = "gathered",
+                                front_placket: bool = False) -> str:
+    """Generate a sleeveless baby dress with a gathered or bubble hem.
 
-    size_label: one of '0-3m', '3-6m', '6-9m', '9-12m', '12-18m', '18-24m'.
-    Difficulty: Beginner. Fabric: cotton lawn or double gauze.
+    Use for: simple sleeveless dresses and pinafores with ONE skirt piece.
+    For a skirt made of 2-3 stacked ruffle layers use
+    generate_tiered_dress_pattern instead.
+
+    size_label: '0-3m', '3-6m', '6-9m', '9-12m', '12-18m', '18-24m'.
+    skirt_style: 'gathered' (flat ruffle hem) or 'bubble' (balloon hem,
+                 gathered at both edges and turned into a lining).
+    front_placket: True adds a button placket down the centre front.
+    Difficulty: Beginner. Fabric: cotton lawn, gingham, or double gauze.
     """
-    return _run_pattern("dress", size_label,
-                         dress.generate, size_label, seam_allowance)
+    return _run_pattern("dress", size_label, dress.generate,
+                        label_extra=skirt_style,
+                        render_params={},
+                        seam_allowance=seam_allowance,
+                        skirt_style=skirt_style,
+                        front_placket=front_placket)
 
 
 @mcp.tool()
-def generate_bib_pattern(size_label: str,
-                         seam_allowance: float = 0.7) -> str:
-    """Generate a drool bib with keyhole neck (snap closure at back).
+def generate_tiered_dress_pattern(size_label: str,
+                                  seam_allowance: float = 1.0,
+                                  tiers: int = 3,
+                                  neckline: str = "round",
+                                  tier_fullness: float = 1.5,
+                                  lace_trim: bool = True) -> str:
+    """Generate a dress whose skirt is 2-3 stacked, gathered ruffle tiers.
 
-    Two-layer: fashion fabric + absorbent terry backing.
+    Use for: boutique-style layered dresses — gingham or floral, with lace
+    between the tiers, and for halter dresses that tie in a bow at the back.
+
+    tiers: 2 or 3 layers.
+    neckline: 'round'  คอกลม ติดกุ๊น/ลูกไม้รอบคอ (มีตะเข็บไหล่)
+              'halter' คอผูกหลัง มีโบว์ใหญ่ผูกด้านหลัง (ไม่มีตะเข็บไหล่)
+              'strap'  สายไหล่เดี่ยว ผูกโบว์บนบ่า
+    tier_fullness: how much wider each tier is than the seam above it
+                   (1.5 = normal gather, 2.0 = very full). Range 1.2-2.5.
+    lace_trim: True adds lace-over-seam notes and counts the lace yardage.
+    Difficulty: Intermediate. Fabric: cotton gingham, lawn, or small florals.
+    """
+    return _run_pattern("tiered_dress", size_label, tiered_dress.generate,
+                        label_extra=f"{tiers}tier_{neckline}",
+                        render_params={"tiers": tiers, "neckline": neckline,
+                                       "tier_fullness": tier_fullness,
+                                       "lace_trim": lace_trim},
+                        seam_allowance=seam_allowance,
+                        tiers=tiers, neckline=neckline,
+                        tier_fullness=tier_fullness, lace_trim=lace_trim)
+
+
+@mcp.tool()
+def generate_bib_pattern(size_label: str, seam_allowance: float = 0.7) -> str:
+    """Generate a drool bib with a keyhole neck (snap closure at back).
+
+    Two layers: fashion fabric + absorbent terry backing.
     Difficulty: Beginner, ideal first project.
     """
-    return _run_pattern("bib", size_label,
-                         bib.generate, size_label, seam_allowance)
+    return _run_pattern("bib", size_label, bib.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_bloomers_pattern(size_label: str,
-                               seam_allowance: float = 1.0) -> str:
-    """Generate elastic-waist bloomers / diaper cover with curved crotch.
+                              seam_allowance: float = 1.0) -> str:
+    """Generate elastic-waist bloomers / diaper cover with a curved crotch.
 
-    Elastic casings at waist + leg openings. Cut 2 on fold.
+    Elastic casings at the waist and both leg openings. Cut 2 on the fold.
+    Pairs with any of the dress patterns.
     """
-    return _run_pattern("bloomers", size_label,
-                         bloomers.generate, size_label, seam_allowance)
+    return _run_pattern("bloomers", size_label, bloomers.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_bonnet_pattern(size_label: str,
-                             seam_allowance: float = 1.0) -> str:
-    """Generate traditional baby bonnet: crown + brim band + ties.
+                            seam_allowance: float = 1.0) -> str:
+    """Generate a traditional baby bonnet: crown + brim band + ties.
 
-    3 pieces. Uses curved edges. Needs 0.3m outer + 0.3m lining.
+    3 pieces with curved edges. Needs 0.3m outer + 0.3m lining fabric.
     """
-    return _run_pattern("bonnet", size_label,
-                         bonnet.generate, size_label, seam_allowance)
+    return _run_pattern("bonnet", size_label, bonnet.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_kimono_top_pattern(size_label: str,
-                                 seam_allowance: float = 1.0) -> str:
+                                seam_allowance: float = 1.0) -> str:
     """Generate a baby kimono wrap top with side ties.
 
-    No buttons, ideal for newborns. Sleeves included.
+    No buttons — ideal for newborns. Sleeves included.
     Difficulty: Beginner. Fabric: cotton lawn, flannel, or jersey.
     """
-    return _run_pattern("kimono_top", size_label,
-                         kimono_top.generate, size_label, seam_allowance)
+    return _run_pattern("kimono_top", size_label, kimono_top.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_pants_pattern(size_label: str,
-                            seam_allowance: float = 1.0,
-                            style: str = "long") -> str:
+                           seam_allowance: float = 1.0,
+                           style: str = "long") -> str:
     """Generate elastic-waist baby pants.
 
-    style: 'long' (full length) or 'short' (shorts length).
+    style: 'long' (full length) or 'short' (shorts).
     Fabric: knit or light woven cotton.
     """
-    return _run_pattern("pants", size_label,
-                         pants.generate, size_label, seam_allowance, style,
-                         label_extra=style)
+    return _run_pattern("pants", size_label, pants.generate,
+                        label_extra=style,
+                        seam_allowance=seam_allowance, style=style)
 
 
 @mcp.tool()
 def generate_tshirt_pattern(size_label: str,
-                             seam_allowance: float = 1.0,
-                             sleeve: str = "short") -> str:
-    """Generate a basic baby t-shirt with crew neck.
+                            seam_allowance: float = 1.0,
+                            sleeve: str = "short") -> str:
+    """Generate a basic baby t-shirt with a crew neck.
 
-    sleeve: 'short' or 'long'. Requires ribbing for neckband.
-    Needs shoulder snaps for newborn sizes.
+    sleeve: 'short' or 'long'. Requires ribbing for the neckband and
+    shoulder snaps for newborn sizes.
     Difficulty: Intermediate. Fabric: cotton jersey.
     """
-    return _run_pattern("tshirt", size_label,
-                         tshirt.generate, size_label, seam_allowance, sleeve,
-                         label_extra=sleeve)
+    return _run_pattern("tshirt", size_label, tshirt.generate,
+                        label_extra=sleeve,
+                        seam_allowance=seam_allowance, sleeve=sleeve)
 
 
 @mcp.tool()
 def generate_romper_pattern(size_label: str,
-                             seam_allowance: float = 1.0) -> str:
+                            seam_allowance: float = 1.0) -> str:
     """Generate a baby romper (one-piece bodysuit with straps and snaps).
 
-    Includes crotch snap placket. Difficulty: Intermediate.
+    Includes a crotch snap placket. Difficulty: Intermediate.
     """
-    return _run_pattern("romper", size_label,
-                         romper.generate, size_label, seam_allowance)
+    return _run_pattern("romper", size_label, romper.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_sleep_sack_pattern(size_label: str,
-                                 seam_allowance: float = 1.0) -> str:
-    """Generate a baby sleep sack (wearable blanket) with front zipper.
+                                seam_allowance: float = 1.0) -> str:
+    """Generate a baby sleep sack (wearable blanket) with a front zipper.
 
     Sleeveless design for safer sleep. Difficulty: Intermediate.
     Fabric: cotton jersey, flannel, or muslin.
     """
-    return _run_pattern("sleep_sack", size_label,
-                         sleep_sack.generate, size_label, seam_allowance)
+    return _run_pattern("sleep_sack", size_label, sleep_sack.generate,
+                        seam_allowance=seam_allowance)
 
 
 @mcp.tool()
 def generate_flutter_romper_pattern(size_label: str,
-                                     seam_allowance: float = 1.0,
-                                     ruffle_height: float = 7.0,
-                                     ruffle_fullness: float = 1.8,
-                                     crotch_snaps: int = 3) -> str:
-    """Generate off-shoulder flutter romper (elastic neckline + cascading ruffle).
+                                    seam_allowance: float = 1.0,
+                                    ruffle_height: float = 7.0,
+                                    ruffle_fullness: float = 1.8,
+                                    crotch_snaps: int = 3) -> str:
+    """Generate an off-shoulder flutter romper (elastic neck + cascading ruffle).
 
-    Matches the popular handmade boutique style: no shoulder seams,
-    ruffle acts as flutter sleeves, bubble body, snap crotch.
-    Best for girls 0-18 months.
+    No shoulder seams — the ruffle acts as flutter sleeves over a bubble
+    body with a snap crotch. Best for girls 0-18 months.
 
-    ruffle_height: depth of the flounce in cm (default 7). Typical 5-9.
-    ruffle_fullness: gather ratio vs neckline (default 1.8x). Typical 1.5-2.2.
-    crotch_snaps: number of snaps across crotch (default 3).
+    ruffle_height: depth of the flounce in cm (default 7, typical 5-9).
+    ruffle_fullness: gather ratio vs the neckline (default 1.8, typical 1.5-2.2).
+    crotch_snaps: number of snaps across the crotch (default 3).
     """
-    return _run_pattern("flutter_romper", size_label,
-                         flutter_romper.generate, size_label, seam_allowance,
-                         ruffle_height, ruffle_fullness, crotch_snaps)
+    return _run_pattern("flutter_romper", size_label, flutter_romper.generate,
+                        render_params={"ruffle_height": ruffle_height,
+                                       "ruffle_fullness": ruffle_fullness},
+                        seam_allowance=seam_allowance,
+                        ruffle_height=ruffle_height,
+                        ruffle_fullness=ruffle_fullness,
+                        crotch_snaps=crotch_snaps)
 
 
 # ============================================================
-# SUPPORT TOOLS (info-only — no file output, no wrapping)
+# SUPPORT TOOLS (no file output)
 # ============================================================
 @mcp.tool()
 def list_available_sizes() -> str:
@@ -612,7 +375,7 @@ def list_available_sizes() -> str:
 
 @mcp.tool()
 def list_all_patterns() -> str:
-    """Return a table of all 9 available patterns with difficulty and time estimates."""
+    """Return every available pattern with its difficulty and time estimate."""
     return features.list_all_patterns()
 
 
@@ -620,94 +383,97 @@ def list_all_patterns() -> str:
 def calculate_fabric_requirement(pattern_type: str, size_label: str) -> str:
     """Estimate fabric needed for a pattern across 90/115/150 cm bolt widths.
 
-    pattern_type: one of 'dress', 'bib', 'bloomers', 'bonnet',
-                  'kimono_top', 'pants', 'tshirt', 'romper', 'sleep_sack'.
+    pattern_type: any key from list_all_patterns, e.g. 'dress',
+                  'tiered_dress', 'bib', 'pants', 'flutter_romper'.
     """
     return features.format_fabric_requirement(pattern_type, size_label)
 
 
 @mcp.tool()
-def generate_shopping_list(pattern_keys: list, size_label: str) -> str:
+def generate_shopping_list(pattern_keys: list, size_label: str,
+                           fabric_width_cm: int = 115) -> str:
     """Generate a consolidated shopping list for one or more patterns.
 
-    pattern_keys: list of pattern names, e.g. ['dress', 'bib'].
-    size_label: e.g. '6-9m'.
-    Returns fabric yardage + notions (thread, elastic, snaps, etc.).
+    pattern_keys: list of pattern names, e.g. ['tiered_dress', 'bloomers'].
+    Returns fabric yardage plus notions (thread, elastic, snaps, lace...).
     """
-    return features.generate_shopping_list(pattern_keys, size_label)
-
-
-@mcp.tool()
-def generate_pattern_preview(pattern_key: str, size_label: str) -> str:
-    """Save a quick PNG thumbnail of a pattern outline (faster than PDF).
-
-    Useful for verifying overall shape and proportions before generating
-    the full tiled PDF. Returns the absolute file path of the PNG.
-
-    pattern_key: one of 'dress', 'bib', 'bloomers', 'bonnet', 'kimono_top',
-                 'pants', 'tshirt', 'romper', 'sleep_sack'.
-    """
-    def _do():
-        path = preview.generate_preview(pattern_key, size_label)
-        if path.startswith("Error"):
-            return path
-        return f"Preview saved: {path}"
-    return _run_in_subdir(f"preview_{pattern_key}_{size_label}", _do)
-
-
-@mcp.tool()
-def generate_cutting_layout(pattern_key: str, size_label: str,
-                             fabric_width_cm: int = 115) -> str:
-    """Generate a PNG showing how to lay out pattern pieces on fabric.
-
-    fabric_width_cm: 90, 115, or 150. Common bolt widths.
-    Helps minimize fabric waste by showing a shelf-packed layout.
-    Returns the absolute file path of the PNG.
-    """
-    def _do():
-        path = cutting_layout.generate_layout(pattern_key, size_label, fabric_width_cm)
-        if path.startswith("Error"):
-            return path
-        return f"Cutting layout saved: {path}"
-    return _run_in_subdir(f"layout_{pattern_key}_{size_label}_{fabric_width_cm}cm", _do)
+    return features.generate_shopping_list(pattern_keys, size_label,
+                                           fabric_width_cm)
 
 
 @mcp.tool()
 def suggest_pattern_from_description(description: str) -> str:
     """Analyse a text description and suggest which pattern tool(s) to use.
 
-    Use this after viewing a reference image and writing a summary, or when
-    the user describes what they want in free text. Returns ranked pattern
-    matches plus suggested parameters.
+    Use this after viewing a reference photo and writing down what you see,
+    or when the user describes what they want in free text. Returns ranked
+    matches plus the suggested parameters for each.
 
-    Does NOT generate files; follow up with a specific generate_*_pattern call.
+    Does NOT generate files — follow up with a specific generate_*_pattern call.
     """
     return customize.suggest_pattern_from_description(description)
 
 
 @mcp.tool()
-def customize_pattern(pattern_key: str, size_label: str, changes: dict) -> str:
-    """Plan a customized pattern call from a structured 'changes' dict.
+def customize_pattern(pattern_key: str, size_label: str,
+                      changes: dict) -> str:
+    """Turn a structured 'changes' dict into a concrete tool call.
 
-    Supported keys in changes:
-      - seam_allowance: float (cm)
-      - style: 'long' or 'short' (pants only)
-      - sleeve: 'long' or 'short' (tshirt only)
-      - notes: free-text (stored for future context)
+    Supported keys depend on the pattern — the reply lists them. Examples:
+      dress:        seam_allowance, skirt_style, front_placket
+      tiered_dress: seam_allowance, tiers, neckline, tier_fullness, lace_trim
+      pants:        seam_allowance, style
+      tshirt:       seam_allowance, sleeve
 
     Returns a recommended tool call. Does not produce files directly.
     """
     return customize.customize_pattern(pattern_key, size_label, changes)
 
 
+# ============================================================
+# FILE-PRODUCING HELPERS
+# ============================================================
+@mcp.tool()
+def generate_pattern_preview(pattern_key: str, size_label: str) -> str:
+    """Save a quick PNG of the flat pattern outline (faster than the PDF).
+
+    Useful for checking overall shape and proportions before committing to
+    a full tiled PDF. Returns the absolute file path of the PNG.
+    """
+    if size_label not in SIZE_CHART:
+        return _size_error(size_label)
+    return _run_file_tool(f"preview_{pattern_key}_{size_label}",
+                          preview.generate_preview, pattern_key, size_label)
+
+
+@mcp.tool()
+def generate_cutting_layout(pattern_key: str, size_label: str,
+                            fabric_width_cm: int = 115) -> str:
+    """Generate a PNG showing how to lay the pieces out on fabric.
+
+    fabric_width_cm: 90, 115, or 150. The fabric is folded automatically
+    when the pattern has cut-on-fold pieces, and the length shown here is
+    the same number calculate_fabric_requirement quotes.
+    """
+    if size_label not in SIZE_CHART:
+        return _size_error(size_label)
+    return _run_file_tool(
+        f"layout_{pattern_key}_{size_label}_{fabric_width_cm}cm",
+        cutting_layout.generate_layout, pattern_key, size_label,
+        fabric_width_cm)
+
+
 @mcp.tool()
 def rebuild_gallery_index() -> str:
     """Force a rebuild of index.html from whatever exists in outputs/.
 
-    Useful after manually moving files around. Returns the path to index.html.
+    Useful after manually moving files around.
     """
-    path = _rebuild_index()
-    runs = _scan_runs()
+    try:
+        path = gallery.rebuild_index()
+    except Exception as e:
+        return f"❌ สร้างแคตตาล็อกไม่สำเร็จ: {e}"
+    runs = gallery.scan_runs()
     return (f"สร้าง index.html ใหม่: {path}\n"
             f"  รวม {len(runs)} รอบในแคตตาล็อก\n"
             f"เปิดในเบราว์เซอร์: file:///{path.replace(os.sep, '/')}")
@@ -716,25 +482,12 @@ def rebuild_gallery_index() -> str:
 # ============================================================
 # GIT / GITHUB PAGES PUBLISHING
 # ============================================================
-# Set to False to disable auto-publish after every pattern generation
-AUTO_PUBLISH = True
-
-
 def _git(*args):
-    """Run git in the project folder. Returns (returncode, stdout, stderr).
-    GIT_TERMINAL_PROMPT=0 ensures git never blocks waiting for credentials —
-    if creds aren't cached, push fails fast with a clear error."""
+    """Run git in the project folder. Returns (returncode, stdout, stderr)."""
     env = os.environ.copy()
-    env["GIT_TERMINAL_PROMPT"] = "0"
-    r = subprocess.run(
-        ["git", *args],
-        cwd=_HERE,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        env=env,
-    )
+    env["GIT_TERMINAL_PROMPT"] = "0"      # never block waiting for a password
+    r = subprocess.run(["git", *args], cwd=_HERE, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", env=env)
     return r.returncode, r.stdout.strip(), r.stderr.strip()
 
 
@@ -742,123 +495,131 @@ def _pages_url() -> str:
     rc, out, _ = _git("config", "--get", "remote.origin.url")
     if rc != 0 or not out:
         return ""
-    m = re.match(r"(?:https://github\.com/|git@github\.com:)([^/]+)/([^/.]+)", out)
+    m = re.match(r"(?:https://github\.com/|git@github\.com:)([^/]+)/([^/.]+)",
+                 out)
     if not m:
         return ""
-    user, repo = m.group(1), m.group(2)
-    return f"https://{user.lower()}.github.io/{repo}/"
+    return f"https://{m.group(1).lower()}.github.io/{m.group(2)}/"
 
 
 def _publish(message: str = "") -> dict:
-    """Internal: stage + commit + push. Returns dict with status info.
-
-    Result dict keys: ok (bool), summary (str — short status line for the
-    pattern tool to append), detail (str — full multi-line message).
-    """
-    # 1. Repo present?
+    """Stage + commit + push. Returns {ok, summary, detail}."""
     rc, _, err = _git("rev-parse", "--git-dir")
     if rc != 0:
-        return {"ok": False,
-                "summary": "⚠ publish ข้าม (ไม่ใช่ git repo)",
+        return {"ok": False, "summary": "⚠ ข้าม publish (ไม่ใช่ git repo)",
                 "detail": f"❌ ไม่ใช่ git repo: {err}"}
 
-    # 2. Stage
+    rc, branch, _ = _git("branch", "--show-current")
+    branch = branch or "HEAD"
+    cfg = _load_config()
+    if (branch in _PROTECTED_BRANCHES
+            and not cfg["allow_publish_to_default_branch"]):
+        return {
+            "ok": False,
+            "summary": (f"⚠ ข้าม publish — อยู่บน branch '{branch}' "
+                        f"ซึ่งป้องกันไว้"),
+            "detail": (f"กำลังอยู่บน branch '{branch}' ระบบไม่ push ผลงาน "
+                       f"ขึ้น branch หลักโดยอัตโนมัติ\n"
+                       f"ทางเลือก: สลับไป branch ทำงานก่อน "
+                       f"(git switch -c gallery) หรือเรียก "
+                       f"set_auto_publish(enabled=True, "
+                       f"allow_default_branch=True) ถ้าตั้งใจจริง")}
+
     rc, _, err = _git("add", "-A")
     if rc != 0:
-        return {"ok": False,
-                "summary": "⚠ git add ล้มเหลว",
+        return {"ok": False, "summary": "⚠ git add ล้มเหลว",
                 "detail": f"❌ git add: {err}"}
 
-    # 3. Anything to commit?
     rc, _, _ = _git("diff", "--cached", "--quiet")
     if rc == 0:
         return {"ok": True,
-                "summary": "ℹ Working tree สะอาด — ไม่มีอะไรต้อง commit",
-                "detail": "ℹ ไม่มีการเปลี่ยนแปลงใหม่"}
+                "summary": "ℹ ไม่มีการเปลี่ยนแปลงใหม่ — ไม่ต้อง commit",
+                "detail": "ℹ working tree สะอาด"}
 
-    # 4. Commit
     if not message:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M")
-        runs = _scan_runs()
-        message = f"อัปเดตแคตตาล็อก ({len(runs)} รอบ) — {ts}"
+        message = f"อัปเดตแคตตาล็อก ({len(gallery.scan_runs())} รอบ) — {ts}"
 
     rc, _, err = _git("commit", "-m", message)
     if rc != 0:
         if "Please tell me who you are" in err or "user.email" in err:
-            hint = ("git ยังไม่รู้ identity — รันคำสั่งนี้ก่อน:\n"
-                    "  git config --global user.email \"your@email.com\"\n"
-                    "  git config --global user.name \"Your Name\"")
             return {"ok": False, "summary": "⚠ ยังไม่ได้ตั้ง git identity",
-                    "detail": hint}
+                    "detail": ("git ยังไม่รู้ว่าคุณเป็นใคร รันคำสั่งนี้ก่อน:\n"
+                               '  git config --global user.email "you@example.com"\n'
+                               '  git config --global user.name "Your Name"')}
         return {"ok": False, "summary": "⚠ git commit ล้มเหลว",
                 "detail": f"❌ git commit: {err}"}
 
-    rc, branch, _ = _git("branch", "--show-current")
-    branch = branch or "HEAD"
-
-    # 5. Push
     rc, _, err = _git("push", "origin", branch)
     if rc != 0:
-        if "could not read Username" in err or "Authentication failed" in err or "terminal prompts disabled" in err:
-            hint = ("ยังไม่ได้ login GitHub บนเครื่องนี้ — รันใน PowerShell ครั้งเดียว:\n"
-                    f"  cd {_HERE}\n"
-                    f"  git push origin {branch}\n"
-                    "Git Credential Manager จะเด้งหน้าต่าง login มา หลังจากนั้นจะจำให้")
+        if any(s in err for s in ("could not read Username",
+                                  "Authentication failed",
+                                  "terminal prompts disabled")):
             return {"ok": False,
-                    "summary": "✓ commit แล้ว แต่ push ล้มเหลว (auth)",
-                    "detail": hint}
-        return {"ok": False,
-                "summary": "✓ commit แล้ว แต่ push ล้มเหลว",
-                "detail": f"git push: {err}\n\npush เองด้วย:\n  cd {_HERE}\n  git push origin {branch}"}
+                    "summary": "✓ commit แล้ว แต่ push ล้มเหลว (ยังไม่ได้ login)",
+                    "detail": ("ยังไม่ได้ login GitHub บนเครื่องนี้ — "
+                               "รันใน terminal ครั้งเดียว:\n"
+                               f"  cd {_HERE}\n"
+                               f"  git push origin {branch}\n"
+                               "หลัง login แล้วระบบจะจำให้")}
+        return {"ok": False, "summary": "✓ commit แล้ว แต่ push ล้มเหลว",
+                "detail": (f"git push: {err}\n\npush เองด้วย:\n"
+                           f"  cd {_HERE}\n  git push origin {branch}")}
 
     pages = _pages_url()
-    summary = f"🚀 Push ขึ้น GitHub แล้ว ({branch}) — Pages อัปเดตใน 1-2 นาที"
+    summary = f"🚀 push ขึ้น GitHub แล้ว ({branch}) — Pages อัปเดตใน 1-2 นาที"
     if pages:
         summary += f"\n   {pages}"
     return {"ok": True, "summary": summary,
-            "detail": f"✓ Commit: {message}\n✓ Push สำเร็จ → {branch}\n\n{pages}"}
+            "detail": f"✓ commit: {message}\n✓ push สำเร็จ → {branch}\n\n{pages}"}
 
 
 @mcp.tool()
 def publish_gallery(message: str = "") -> str:
     """Manually commit + push the catalog (index.html + outputs/) to GitHub.
 
-    Use this if AUTO_PUBLISH is disabled, or to force a custom commit message.
-    By default, every generate_*_pattern call already auto-publishes.
-
-    message: optional commit message.
+    Use this when auto-publish is off, or to force a custom commit message.
     """
     result = _publish(message)
     return result["detail"] or result["summary"]
 
 
 @mcp.tool()
-def set_auto_publish(enabled: bool) -> str:
+def set_auto_publish(enabled: bool,
+                     allow_default_branch: bool = False) -> str:
     """Enable/disable auto-publish to GitHub after each pattern generation.
 
-    When enabled (default): every successful generate_*_pattern automatically
-    runs git add + commit + push. The catalog on GitHub Pages stays in sync.
+    The setting is saved to .engine_config.json so it survives a restart.
 
-    When disabled: patterns are only saved locally. Use publish_gallery
-    manually when you want to publish a batch.
+    enabled: when True, every successful generate_*_pattern runs
+             git add + commit + push.
+    allow_default_branch: by default the server refuses to auto-push while
+             on 'main'/'master' so generated output never lands on the main
+             branch by accident. Set True only if that is what you want.
     """
-    global AUTO_PUBLISH
-    AUTO_PUBLISH = bool(enabled)
-    state = "เปิด" if AUTO_PUBLISH else "ปิด"
-    return f"✓ Auto-publish: {state}"
+    cfg = _load_config()
+    cfg["auto_publish"] = bool(enabled)
+    cfg["allow_publish_to_default_branch"] = bool(allow_default_branch)
+    _save_config(cfg)
+    state = "เปิด" if cfg["auto_publish"] else "ปิด"
+    guard = ("อนุญาต" if cfg["allow_publish_to_default_branch"] else "ไม่อนุญาต")
+    return (f"✓ auto-publish: {state}\n"
+            f"✓ push ขึ้น branch หลัก (main/master): {guard}\n"
+            f"บันทึกไว้ที่ {CONFIG_PATH}")
 
 
 @mcp.tool()
 def git_status_summary() -> str:
-    """Show what's currently uncommitted in the project (for sanity-check
-    before publish_gallery)."""
+    """Show what is currently uncommitted (sanity check before publishing)."""
     rc, out, err = _git("status", "--short")
     if rc != 0:
         return f"❌ git status ล้มเหลว:\n{err}"
     if not out:
-        return "✓ Working tree สะอาด — ไม่มีอะไรต้อง commit"
+        return "✓ working tree สะอาด — ไม่มีอะไรต้อง commit"
+    rc, branch, _ = _git("branch", "--show-current")
     lines = out.splitlines()
-    return f"มีไฟล์เปลี่ยน {len(lines)} ไฟล์:\n\n" + out
+    return (f"branch ปัจจุบัน: {branch or 'HEAD'}\n"
+            f"มีไฟล์เปลี่ยน {len(lines)} ไฟล์:\n\n{out}")
 
 
 if __name__ == "__main__":

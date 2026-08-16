@@ -5,10 +5,12 @@ from reportlab.lib.colors import black, gray, red
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save)
+                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
-def generate(size_label: str, seam_allowance: float = 1.0) -> str:
+def generate(size_label: str, seam_allowance: float = 1.0,
+             output_dir: str = ".") -> str:
     spec = get_size(size_label)
 
     chest_half = spec["chest"] / 4 + 2.0
@@ -40,10 +42,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_romper_body(c, fx, fy, chest_half, bodice_h, rise, crotch_w,
                           neck_w, neck_drop, shoulder, armhole_w, armhole_drop,
                           leg_opening, "front")
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((fx + 0.5) * cm, (fy + bodice_h + rise * 0.1) * cm,
                      "1. Front - ตัด 1 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((fx + 0.5) * cm, (fy + bodice_h + rise * 0.05) * cm,
                      f"Size {size_label}")
         draw_fold_edge(c, fx, fy, fx, fy + bodice_h + rise)
@@ -59,7 +61,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
             snap_x = fx + crotch_w * 0.3 + i * 1.3
             c.circle(snap_x * cm, (fy + 0.5) * cm, 0.15 * cm, fill=1)
         c.setFillColor(black)
-        c.setFont("Tahoma", 6)
+        c.setFont(THAI_FONT, 6)
         c.setFillColor(red)
         c.drawString((fx + crotch_w + 0.3) * cm, (fy + 0.3) * cm,
                      "3 snaps")
@@ -72,7 +74,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_romper_body(c, bx, by, chest_half, bodice_h, rise, crotch_w,
                           neck_w, neck_drop * 0.3, shoulder, armhole_w,
                           armhole_drop, leg_opening, "back")
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((bx + 0.5) * cm, (by + bodice_h + rise * 0.1) * cm,
                      "2. Back - ตัด 1 ชิ้นบนรอยพับ")
         draw_fold_edge(c, bx, by, bx, by + bodice_h + rise)
@@ -86,10 +88,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         sx, sy = 2.0, y_cursor
         c.setLineWidth(1.3)
         c.rect(sx * cm, sy * cm, strap_len * cm, strap_w * cm)
-        c.setFont("Tahoma-Bold", 9)
+        c.setFont(THAI_FONT_BOLD, 9)
         c.drawString((sx + 0.5) * cm, (sy + strap_w * 0.55) * cm,
                      "3. Strap - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((sx + 0.5) * cm, (sy + strap_w * 0.2) * cm,
                      f"{strap_len:.1f} x {strap_w:.1f}cm  (fold, sew, turn)")
         draw_grain_line(c,
@@ -118,7 +120,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
-    file_path = os.path.abspath(f"romper_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"romper_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(file_path, "ชุดหมี", size_label,
                                  total_w, total_h, draw, instructions)
 

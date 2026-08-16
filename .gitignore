@@ -20,3 +20,9 @@ venv/
 /cutting_layout_*.png
 
 # Track everything inside outputs/ (for GitHub Pages gallery)
+
+# Runtime settings written by set_auto_publish
+/.engine_config.json
+
+# Test scratch
+.pytest_cache/

@@ -10,8 +10,9 @@ Output PNG: rendered_<pattern_key>_<size>.png
 """
 import os
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
+from fonts import pil_font
 from sizes import get_size
 
 
@@ -31,19 +32,7 @@ SHADOW = "#cfd8dc"
 
 
 def _font(size=18, bold=False):
-    candidates = [
-        r"C:\Windows\Fonts\tahomabd.ttf" if bold else r"C:\Windows\Fonts\tahoma.ttf",
-        r"C:\Windows\Fonts\leelawdb.ttf" if bold else r"C:\Windows\Fonts\leelawad.ttf",
-        "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf" if bold
-            else "/usr/share/fonts/truetype/tlwg/Loma.ttf",
-        "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf",
-    ]
-    for f in candidates:
-        try:
-            return ImageFont.truetype(f, size)
-        except Exception:
-            continue
-    return ImageFont.load_default()
+    return pil_font(size, bold=bold)
 
 
 def _bezier(draw, p0, p1, p2, p3, fill, width=2, steps=40):
@@ -685,14 +674,129 @@ def _render_flutter_romper(spec):
 
 
 # ============================================================
+# TIERED DRESS — bodice over 2-3 ruffled layers
+# ============================================================
+def _render_tiered_dress(spec, tiers=3, neckline="round", lace_trim=True,
+                         **_ignored):
+    img, d = _new_canvas("#fdf4f8")
+    cx = CENTER
+    tiers = max(2, min(3, int(tiers)))
+
+    top_y = 90
+    bodice_w = 132
+    bodice_h = 150
+    bx_l, bx_r = cx - bodice_w // 2, cx + bodice_w // 2
+    bb_y = top_y + bodice_h
+
+    # --- neckline hardware ---
+    if neckline == "halter":
+        # big bow above a narrow gathered neckline
+        neck_half = 34
+        for side in (-1, 1):
+            d.polygon([(cx, top_y - 26),
+                       (cx + side * 62, top_y - 54),
+                       (cx + side * 62, top_y - 2)],
+                      fill=FABRIC_PINK_DK, outline=OUTLINE)
+        d.ellipse([cx - 11, top_y - 37, cx + 11, top_y - 15],
+                  fill=FABRIC_PINK, outline=OUTLINE, width=2)
+        for side in (-1, 1):
+            d.line([(cx + side * 20, top_y - 14),
+                    (cx + side * neck_half, top_y + 4)],
+                   fill=OUTLINE, width=3)
+    elif neckline == "strap":
+        for sx in (cx - 42, cx + 42):
+            d.rectangle([sx - 7, top_y - 44, sx + 7, top_y + 4],
+                        fill=FABRIC_PINK_DK, outline=OUTLINE, width=2)
+            # shoulder bow: two loops meeting at a knot on top of the strap
+            ky = top_y - 44
+            for side in (-1, 1):
+                d.polygon([(sx, ky), (sx + side * 24, ky - 16),
+                           (sx + side * 24, ky + 10)],
+                          fill=FABRIC_PINK, outline=OUTLINE)
+            d.ellipse([sx - 6, ky - 6, sx + 6, ky + 6],
+                      fill=FABRIC_PINK_DK, outline=OUTLINE, width=2)
+
+    # --- bodice ---
+    _smooth_path(d, [(bx_l, top_y + 6), (bx_l, bb_y),
+                     (bx_r, bb_y), (bx_r, top_y + 6)], FABRIC_PINK)
+    if neckline == "round":
+        _bezier(d, (bx_l + 12, top_y + 6), (cx - 32, top_y + 40),
+                (cx + 32, top_y + 40), (bx_r - 12, top_y + 6),
+                fill=OUTLINE, width=3)
+        if lace_trim:
+            _bezier(d, (bx_l + 12, top_y + 13), (cx - 32, top_y + 47),
+                    (cx + 32, top_y + 47), (bx_r - 12, top_y + 13),
+                    fill="#ffffff", width=6)
+            _bezier(d, (bx_l + 12, top_y + 13), (cx - 32, top_y + 47),
+                    (cx + 32, top_y + 47), (bx_r - 12, top_y + 13),
+                    fill=STITCH, width=1)
+    else:
+        d.line([(bx_l + 4, top_y + 6), (bx_r - 4, top_y + 6)],
+               fill=OUTLINE, width=3)
+
+    # gingham-ish texture on the bodice
+    for gx in range(bx_l + 8, bx_r - 4, 14):
+        d.line([(gx, top_y + 10), (gx, bb_y - 3)], fill=FABRIC_PINK_DK, width=2)
+    for gy in range(top_y + 16, bb_y - 3, 14):
+        d.line([(bx_l + 3, gy), (bx_r - 3, gy)], fill=FABRIC_PINK_DK, width=2)
+
+    # --- tiers ---
+    avail_h = H - 120 - bb_y
+    tier_h = avail_h / tiers
+    widths = [bodice_w * (1.45 ** (i + 1)) for i in range(tiers)]
+    widths = [min(w, W - 60) for w in widths]
+
+    y = bb_y
+    prev_half = bodice_w / 2
+    for i in range(tiers):
+        half = widths[i] / 2
+        y2 = y + tier_h
+        shade = FABRIC_PINK if i % 2 == 0 else FABRIC_PINK_DK
+        _smooth_path(d, [(cx - prev_half, y), (cx - half, y2),
+                         (cx + half, y2), (cx + prev_half, y)], shade)
+        # gather ripples along the seam
+        n = 11
+        for k in range(1, n):
+            t = k / n
+            sx = cx - prev_half + prev_half * 2 * t
+            ex = cx - half + half * 2 * t
+            _bezier(d, (sx, y + 3), (sx, y + tier_h * 0.35),
+                    (ex, y2 - tier_h * 0.35), (ex, y2 - 3),
+                    fill=STITCH, width=1, steps=16)
+        if lace_trim and i < tiers - 1:
+            d.line([(cx - half - 2, y2), (cx + half + 2, y2)],
+                   fill="#ffffff", width=7)
+            d.line([(cx - half - 2, y2), (cx + half + 2, y2)],
+                   fill=STITCH, width=1)
+        prev_half = half
+        y = y2
+
+    # scalloped hem on the last tier
+    n_scallops = 9
+    step = (prev_half * 2) / n_scallops
+    for k in range(n_scallops):
+        sx = cx - prev_half + k * step
+        d.arc([sx, y - 9, sx + step, y + 9], start=0, end=180,
+              fill=OUTLINE, width=2)
+
+    neck_th = {"round": "คอกลม", "halter": "คอผูกหลัง",
+               "strap": "สายไหล่"}[neckline]
+    _label(img, f"เดรสกระโปรงชั้น  •  {tiers} ชั้น  •  {neck_th}", 18)
+    return img
+
+
+# ============================================================
 # ENTRY POINT
 # ============================================================
-def render_finished(pattern_key: str, size_label: str) -> str:
+def render_finished(pattern_key: str, size_label: str,
+                    output_dir: str = ".", **params) -> str:
     """Render a stylised 'finished garment' preview and save as PNG.
     Returns the absolute file path."""
     spec = get_size(size_label)
 
-    if pattern_key == "dress":
+    if pattern_key == "tiered_dress":
+        img = _render_tiered_dress(spec, **params)
+    elif pattern_key == "dress":
         img = _render_dress(spec)
     elif pattern_key == "bib":
         img = _render_bib(spec)
@@ -715,6 +819,7 @@ def render_finished(pattern_key: str, size_label: str) -> str:
     else:
         return f"Error: unknown pattern '{pattern_key}'"
 
-    file_path = os.path.abspath(f"rendered_{pattern_key}_{size_label}.png")
+    file_path = os.path.abspath(
+        os.path.join(output_dir, f"rendered_{pattern_key}_{size_label}.png"))
     img.save(file_path, "PNG")
     return file_path

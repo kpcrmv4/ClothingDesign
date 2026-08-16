@@ -5,10 +5,11 @@ from reportlab.lib.units import cm
 from reportlab.lib.colors import black, red
 
 from sizes import get_size
-from drawing import draw_grain_line, draw_bezier_edge, tile_and_save
+from drawing import draw_grain_line, draw_bezier_edge, tile_and_save, THAI_FONT, THAI_FONT_BOLD
 
 
-def generate(size_label: str, seam_allowance: float = 0.7) -> str:
+def generate(size_label: str, seam_allowance: float = 0.7,
+             output_dir: str = ".") -> str:
     spec = get_size(size_label)
 
     body_w = spec["neck_circ"] * 0.9
@@ -74,10 +75,10 @@ def generate(size_label: str, seam_allowance: float = 0.7) -> str:
                cx * cm, (top_y - neck_r * 1.8 - 2.0) * cm)
         c.setDash([], 0)
 
-        c.setFont("Tahoma-Bold", 11)
+        c.setFont(THAI_FONT_BOLD, 11)
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.55) * cm,
                             "Bib - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 8)
+        c.setFont(THAI_FONT, 8)
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.48) * cm,
                             f"Size {size_label}")
         c.drawCentredString(cx * cm, (bottom_y + body_h * 0.42) * cm,
@@ -88,7 +89,7 @@ def generate(size_label: str, seam_allowance: float = 0.7) -> str:
 
         c.setFillColor(red)
         c.circle(cx * cm, (top_y - neck_r * 1.8 - 2.2) * cm, 0.15 * cm, fill=1)
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((cx + 0.3) * cm, (top_y - neck_r * 1.8 - 2.3) * cm,
                      "snap")
         c.setFillColor(black)
@@ -113,7 +114,7 @@ def generate(size_label: str, seam_allowance: float = 0.7) -> str:
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
-    file_path = os.path.abspath(f"bib_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"bib_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(file_path, "ผ้ากันเปื้อน", size_label,
                                  total_w, total_h, draw, instructions)
 

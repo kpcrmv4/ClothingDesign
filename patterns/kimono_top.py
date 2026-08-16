@@ -5,10 +5,12 @@ from reportlab.lib.colors import black, gray
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save)
+                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
-def generate(size_label: str, seam_allowance: float = 1.0) -> str:
+def generate(size_label: str, seam_allowance: float = 1.0,
+             output_dir: str = ".") -> str:
     spec = get_size(size_label)
 
     chest_half = spec["chest"] / 4 + 2.0
@@ -35,10 +37,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         bx, by = 2.0, y_cursor
         _draw_kimono_back(c, bx, by, chest_half, body_len,
                           neck_width, neck_drop_back, shoulder_w)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((bx + 0.5) * cm, (by + body_len * 0.85) * cm,
                      "1. Back - ตัด 1 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((bx + 0.5) * cm, (by + body_len * 0.8) * cm,
                      f"Size {size_label}  |  {chest_half:.1f} x {body_len:.1f}cm")
         draw_grain_line(c,
@@ -53,10 +55,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         fx, fy = 2.0, y_cursor
         _draw_kimono_front(c, fx, fy, chest_half, body_len,
                            neck_width, neck_drop_front, shoulder_w)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((fx + 0.5) * cm, (fy + body_len * 0.85) * cm,
                      "2. Front - ตัด 2 ชิ้น (mirror)")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((fx + 0.5) * cm, (fy + body_len * 0.8) * cm,
                      "Right front overlaps left at closure")
         draw_grain_line(c,
@@ -69,10 +71,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         # --- Sleeve (cut 2) ---
         sx, sy = 2.0, y_cursor
         _draw_sleeve(c, sx, sy, sleeve_cap_w, sleeve_len, sleeve_cuff)
-        c.setFont("Tahoma-Bold", 10)
+        c.setFont(THAI_FONT_BOLD, 10)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.85) * cm,
                      "3. Sleeve - ตัด 2 ชิ้น")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((sx + 0.5) * cm, (sy + sleeve_len * 0.78) * cm,
                      f"Cap {sleeve_cap_w:.1f}cm | Cuff {sleeve_cuff:.1f}cm "
                      f"| Length {sleeve_len:.1f}cm")
@@ -102,7 +104,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} ซม",
     ]
 
-    file_path = os.path.abspath(f"kimono_top_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"kimono_top_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(file_path, "เสื้อป้ายผูกข้าง", size_label,
                                  total_w, total_h, draw, instructions)
 

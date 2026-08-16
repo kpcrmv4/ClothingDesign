@@ -20,38 +20,70 @@ from constants import PAGE_MARGIN_CM, PRINTABLE_W_CM, PRINTABLE_H_CM
 # THAI FONT SETUP
 # ============================================================
 # Register a TTF that supports Thai glyphs so PDF labels render correctly.
-# Patterns reference the registered names via setFont("Tahoma", ...).
-THAI_FONT = "Tahoma"
-THAI_FONT_BOLD = "Tahoma-Bold"
-_FONT_REGISTERED = False
+# Patterns must reference the registered names through the THAI_FONT /
+# THAI_FONT_BOLD constants — never a hardcoded "Tahoma", because on a
+# machine with no Thai font installed these fall back to Helvetica and a
+# hardcoded name would raise KeyError deep inside reportlab instead.
+_FONT_CANDIDATES = [
+    (r"C:\Windows\Fonts\tahoma.ttf",   r"C:\Windows\Fonts\tahomabd.ttf",
+     "Tahoma", "Tahoma-Bold"),
+    (r"C:\Windows\Fonts\leelawad.ttf", r"C:\Windows\Fonts\leelawdb.ttf",
+     "Leelawadee", "Leelawadee-Bold"),
+    ("/usr/share/fonts/truetype/tlwg/Loma.ttf",
+     "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf",
+     "Loma", "Loma-Bold"),
+    ("/usr/share/fonts/truetype/tlwg/Garuda.ttf",
+     "/usr/share/fonts/truetype/tlwg/Garuda-Bold.ttf",
+     "Garuda", "Garuda-Bold"),
+    ("/usr/share/fonts/truetype/noto/NotoSansThai-Regular.ttf",
+     "/usr/share/fonts/truetype/noto/NotoSansThai-Bold.ttf",
+     "NotoSansThai", "NotoSansThai-Bold"),
+    ("/System/Library/Fonts/Supplemental/Thonburi.ttc", "",
+     "Thonburi", "Thonburi-Bold"),
+]
+
+# Filled in by _register_thai_font(); Helvetica is the no-Thai-font fallback.
+THAI_FONT = "Helvetica"
+THAI_FONT_BOLD = "Helvetica-Bold"
+FONT_WARNING = ""
 
 
 def _register_thai_font():
-    global _FONT_REGISTERED
-    if _FONT_REGISTERED:
-        return
-    candidates = [
-        (r"C:\Windows\Fonts\tahoma.ttf",   r"C:\Windows\Fonts\tahomabd.ttf"),
-        (r"C:\Windows\Fonts\leelawad.ttf", r"C:\Windows\Fonts\leelawdb.ttf"),
-        ("/usr/share/fonts/truetype/tlwg/Loma.ttf",
-         "/usr/share/fonts/truetype/tlwg/Loma-Bold.ttf"),
-    ]
-    for reg_path, bold_path in candidates:
+    """Register the first available Thai TTF. Falls back to Helvetica.
+
+    Returns a warning string (empty when a Thai font was found) so callers
+    can tell the user why their PDF shows boxes instead of Thai text.
+    """
+    global THAI_FONT, THAI_FONT_BOLD, FONT_WARNING
+    for reg_path, bold_path, name, bold_name in _FONT_CANDIDATES:
         if not os.path.exists(reg_path):
             continue
         try:
-            pdfmetrics.registerFont(TTFont(THAI_FONT, reg_path))
-            if os.path.exists(bold_path):
-                pdfmetrics.registerFont(TTFont(THAI_FONT_BOLD, bold_path))
+            pdfmetrics.registerFont(TTFont(name, reg_path))
+            if bold_path and os.path.exists(bold_path):
+                pdfmetrics.registerFont(TTFont(bold_name, bold_path))
             else:
-                pdfmetrics.registerFont(TTFont(THAI_FONT_BOLD, reg_path))
-            _FONT_REGISTERED = True
-            return
+                pdfmetrics.registerFont(TTFont(bold_name, reg_path))
+            THAI_FONT, THAI_FONT_BOLD = name, bold_name
+            FONT_WARNING = ""
+            return FONT_WARNING
         except Exception:
             continue
 
+    FONT_WARNING = (
+        "ไม่พบฟอนต์ภาษาไทยในเครื่องนี้ — ข้อความไทยใน PDF จะแสดงไม่ถูกต้อง "
+        "(ใช้ Helvetica แทน) ติดตั้งฟอนต์ เช่น Tahoma / Leelawadee / "
+        "Noto Sans Thai แล้วสร้างใหม่อีกครั้ง"
+    )
+    return FONT_WARNING
+
 
 _register_thai_font()
+
+
+def font_warning() -> str:
+    """Empty string when Thai rendering is fine, otherwise an explanation."""
+    return FONT_WARNING
 
 
 def grid_ref(col: int, row: int) -> str:
