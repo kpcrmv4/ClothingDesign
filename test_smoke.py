@@ -24,13 +24,14 @@ import features
 import geometry
 import preview
 import rendered
-from patterns import (dress, tiered_dress, bib, bloomers, bonnet, kimono_top,
+from patterns import (dress, tiered_dress, flutter_top, bib, bloomers, bonnet, kimono_top,
                       pants, tshirt, romper, sleep_sack, flutter_romper)
 from sizes import SIZE_CHART
 
 GENERATORS = {
     "dress": dress.generate,
     "tiered_dress": tiered_dress.generate,
+    "flutter_top": flutter_top.generate,
     "bib": bib.generate,
     "bloomers": bloomers.generate,
     "bonnet": bonnet.generate,
@@ -147,6 +148,9 @@ def test_pattern_style_options():
          {"tiers": 3, "neckline": "strap", "lace_trim": False}),
         ("tiered_dress", tiered_dress.generate,
          {"tiers": 3, "neckline": "round", "tier_fullness": 2.2}),
+        ("flutter_top", flutter_top.generate,
+         {"neck_finish": "binding"}),
+        ("flutter_top", flutter_top.generate, {"sleeve_fullness": 2.2}),
         ("pants", pants.generate, {"style": "short"}),
         ("tshirt", tshirt.generate, {"sleeve": "long"}),
         ("flutter_romper", flutter_romper.generate, {"ruffle_height": 9.0}),

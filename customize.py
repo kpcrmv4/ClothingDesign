@@ -23,6 +23,9 @@ _KEYWORDS = {
                      "กระโปรงชั้น", "เดรสกระโปรงชั้น", "กระโปรงหลายชั้น",
                      "ชายระบายหลายชั้น", "เดรสชั้น", "ระบายเป็นชั้น",
                      "คอผูกหลัง", "ผูกโบว์หลัง"],
+    "flutter_top": ["flutter top", "flutter sleeve top", "peasant top",
+                    "blouse", "ruffle sleeve", "เสื้อคอระบาย", "เสื้อแขนระบาย",
+                    "เสื้อตัวใน", "เสื้อขาวคอระบาย", "เสื้อระบาย"],
     "dress": ["dress", "sundress", "frock", "เดรส", "กระโปรง", "ชุดกระโปรง"],
     "bib": ["bib", "drool", "ผ้ากันเปื้อน", "กันเปื้อน"],
     "bloomers": ["bloomer", "bloomers", "diaper cover", "nappy cover",
@@ -166,6 +169,14 @@ def _infer_params(pattern_key: str, desc: str) -> dict:
         if any(w in desc for w in ["no lace", "without lace", "ไม่มีลูกไม้"]):
             params["lace_trim"] = False
 
+    elif pattern_key == "flutter_top":
+        if any(w in desc for w in ["plain neck", "bound neck", "binding",
+                                   "คอเรียบ", "กุ๊นคอ"]):
+            params["neck_finish"] = "binding"
+        elif any(w in desc for w in ["ruffle neck", "frill neck",
+                                     "คอระบาย", "คอจีบ"]):
+            params["neck_finish"] = "ruffle"
+
     if any(w in desc for w in ["thin seam", "narrow seam", "small seam",
                                "ตะเข็บแคบ"]):
         params["seam_allowance"] = 0.7
@@ -189,6 +200,8 @@ _ALLOWED_CHANGES = {
     "neckline": str,
     "tier_fullness": float,
     "lace_trim": bool,
+    "sleeve_fullness": float,
+    "neck_finish": str,
     "ruffle_height": float,
     "ruffle_fullness": float,
     "crotch_snaps": int,
@@ -199,6 +212,7 @@ _PATTERN_PARAMS = {
     "dress": {"seam_allowance", "skirt_style", "front_placket"},
     "tiered_dress": {"seam_allowance", "tiers", "neckline",
                      "tier_fullness", "lace_trim"},
+    "flutter_top": {"seam_allowance", "sleeve_fullness", "neck_finish"},
     "pants": {"seam_allowance", "style"},
     "tshirt": {"seam_allowance", "sleeve"},
     "flutter_romper": {"seam_allowance", "ruffle_height",
@@ -210,6 +224,7 @@ _ENUMS = {
     "sleeve": ("short", "long"),
     "skirt_style": ("gathered", "bubble"),
     "neckline": ("round", "halter", "strap"),
+    "neck_finish": ("ruffle", "binding"),
 }
 
 

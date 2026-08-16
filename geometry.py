@@ -144,6 +144,39 @@ def tiered_dress_dims(spec, tiers: int = 3,
     return d
 
 
+def flutter_top_dims(spec, sleeve_fullness: float = 1.8,
+                     neck_finish: str = "ruffle") -> dict:
+    """Short pull-on top with flutter sleeves — worn under a pinafore dress.
+
+    neck_finish: 'ruffle' (gathered frill standing up round the neck) or
+                 'binding' (flat bias-bound neckline).
+    """
+    chest_half = spec["chest"] / 4 + 2.5
+    armhole_drop = spec["arm_len"] * 0.28 + 4.0
+    # Flutter sleeves are flared strips gathered into the armhole; the cap
+    # length is roughly the armhole arc for front + back.
+    sleeve_cap = armhole_drop * 2.1
+    neck_circ = spec["neck_circ"]
+    return {
+        "chest_half": chest_half,
+        "length": spec["length"] * 0.55,
+        "neck_width": neck_circ / 6 + 0.3,
+        "neck_drop_front": 4.5,
+        "neck_drop_back": 1.5,
+        "shoulder_w": spec["shoulder"] - 0.5,
+        "armhole_drop": armhole_drop,
+        "armhole_width": 2.5,
+        "sleeve_cap": sleeve_cap,
+        "sleeve_w": sleeve_cap * sleeve_fullness,
+        "sleeve_h": spec["arm_len"] * 0.3,
+        "sleeve_fullness": sleeve_fullness,
+        "neck_finish": neck_finish,
+        "neck_strip_l": (neck_circ * 1.6 if neck_finish == "ruffle"
+                         else neck_circ * 0.95),
+        "neck_strip_h": 4.5 if neck_finish == "ruffle" else 3.5,
+    }
+
+
 def bib_dims(spec) -> dict:
     body_w = spec["neck_circ"] * 0.9
     return {
@@ -346,6 +379,24 @@ def get_pieces(pattern_key: str, size_label: str, **params) -> list:
             pieces.append(_piece("Strap", "สายไหล่",
                                  d["strap_w"], d["strap_h"], 2))
         return pieces
+
+    if pattern_key == "flutter_top":
+        d = flutter_top_dims(
+            spec,
+            sleeve_fullness=params.get("sleeve_fullness", 1.8),
+            neck_finish=params.get("neck_finish", "ruffle"))
+        return [
+            _piece("Front (fold)", "ตัวหน้า (ทบ)",
+                   d["chest_half"], d["length"], 1, on_fold=True,
+                   rotatable=False),
+            _piece("Back (fold)", "ตัวหลัง (ทบ)",
+                   d["chest_half"], d["length"], 1, on_fold=True,
+                   rotatable=False),
+            _piece("Flutter sleeve", "แขนระบาย",
+                   d["sleeve_w"], d["sleeve_h"], 2),
+            _piece("Neck strip", "แถบคอ",
+                   d["neck_strip_l"], d["neck_strip_h"], 1),
+        ]
 
     if pattern_key == "bib":
         d = bib_dims(spec)

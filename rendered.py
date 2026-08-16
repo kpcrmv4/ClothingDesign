@@ -674,6 +674,70 @@ def _render_flutter_romper(spec):
 
 
 # ============================================================
+# FLUTTER TOP — short blouse with flutter sleeves
+# ============================================================
+def _render_flutter_top(spec, neck_finish="ruffle", **_ignored):
+    img, d = _new_canvas("#f7fbfd")
+    cx = CENTER
+    top_y = 150
+    body_w = 190
+    body_h = 250
+    bx_l, bx_r = cx - body_w // 2, cx + body_w // 2
+    bb_y = top_y + body_h
+
+    # flutter sleeves fall open over each shoulder
+    for side in (-1, 1):
+        sx = cx + side * (body_w // 2)
+        pts = [(sx - side * 26, top_y + 12),
+               (sx + side * 74, top_y + 40),
+               (sx + side * 58, top_y + 130),
+               (sx - side * 6, top_y + 96)]
+        _smooth_path(d, pts, FABRIC_BLUE)
+        for k in range(1, 5):
+            t = k / 5
+            _bezier(d,
+                    (sx - side * 26 + side * 100 * t, top_y + 14 + 6 * k),
+                    (sx + side * (30 + 8 * k), top_y + 50 + 8 * k),
+                    (sx + side * (44 + 6 * k), top_y + 80 + 6 * k),
+                    (sx + side * (30 + 4 * k), top_y + 110 + 4 * k),
+                    fill=STITCH, width=1, steps=14)
+
+    # body
+    _smooth_path(d, [(bx_l, top_y), (bx_l, bb_y),
+                     (bx_r, bb_y), (bx_r, top_y)], "#ffffff")
+
+    # neckline
+    if neck_finish == "ruffle":
+        # standing frill: a scalloped band round the neck opening
+        _bezier(d, (cx - 52, top_y + 4), (cx - 24, top_y + 44),
+                (cx + 24, top_y + 44), (cx + 52, top_y + 4),
+                fill=OUTLINE, width=3)
+        for k in range(9):
+            t = k / 8
+            px = cx - 58 + 116 * t
+            py = top_y - 6 + 30 * (0.5 - abs(t - 0.5)) * 2
+            d.arc([px - 9, py - 12, px + 9, py + 8],
+                  start=180, end=360, fill=OUTLINE, width=2)
+    else:
+        _bezier(d, (cx - 52, top_y + 4), (cx - 24, top_y + 44),
+                (cx + 24, top_y + 44), (cx + 52, top_y + 4),
+                fill=OUTLINE, width=4)
+
+    # subtle eyelet texture
+    for gy in range(top_y + 70, bb_y - 20, 34):
+        for gx in range(bx_l + 22, bx_r - 14, 34):
+            d.ellipse([gx, gy, gx + 7, gy + 7], outline=SHADOW, width=2)
+
+    # hem
+    d.line([(bx_l, bb_y), (bx_r, bb_y)], fill=OUTLINE, width=3)
+    d.line([(bx_l, bb_y - 9), (bx_r, bb_y - 9)], fill=STITCH, width=1)
+
+    finish_th = "คอระบายตั้ง" if neck_finish == "ruffle" else "คอเรียบกุ๊น"
+    _label(img, f"เสื้อคอระบาย แขนระบาย  •  {finish_th}", 18)
+    return img
+
+
+# ============================================================
 # TIERED DRESS — bodice over 2-3 ruffled layers
 # ============================================================
 def _render_tiered_dress(spec, tiers=3, neckline="round", lace_trim=True,
@@ -796,6 +860,8 @@ def render_finished(pattern_key: str, size_label: str,
 
     if pattern_key == "tiered_dress":
         img = _render_tiered_dress(spec, **params)
+    elif pattern_key == "flutter_top":
+        img = _render_flutter_top(spec, **params)
     elif pattern_key == "dress":
         img = _render_dress(spec)
     elif pattern_key == "bib":

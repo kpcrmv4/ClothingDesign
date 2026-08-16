@@ -357,6 +357,58 @@ def _preview_tiered_dress(spec, tiers=3, neckline="round",
     return img
 
 
+def _preview_flutter_top(spec, **params):
+    """Front body outline with the flutter sleeve strip sketched beside it."""
+    d = geometry.flutter_top_dims(spec, **params)
+    bw, bh = d["chest_half"], d["length"]
+    sw, sh = d["sleeve_w"], d["sleeve_h"]
+
+    total_w = max(bw, sw) + 2
+    total_h = bh + sh + 3
+    img, draw, tx = _setup_canvas(total_w, total_h)
+    font = _get_font(14)
+    label_font = _get_font(10)
+
+    x, y = 1.0, 1.0 + sh + 1.0
+    nw, nd = d["neck_width"], d["neck_drop_front"]
+    tip = min(x + nw + d["shoulder_w"], x + bw - 0.5)
+
+    _draw_line_pil(draw, tx, x, y, x + bw, y)                     # hem
+    _draw_line_pil(draw, tx, x + nw, y + bh, tip, y + bh)         # shoulder
+    _draw_bezier_pil(draw, tx,
+                     (x, y + bh - nd), (x + nw * 0.35, y + bh - nd),
+                     (x + nw, y + bh - nd * 0.3), (x + nw, y + bh))
+    _draw_bezier_pil(draw, tx,
+                     (tip, y + bh),
+                     (tip + (x + bw - tip) * 0.25,
+                      y + bh - d["armhole_drop"] * 0.35),
+                     (x + bw - d["armhole_width"] * 0.5,
+                      y + bh - d["armhole_drop"] * 0.7),
+                     (x + bw, y + bh - d["armhole_drop"]))
+    _draw_line_pil(draw, tx, x + bw, y + bh - d["armhole_drop"], x + bw, y)
+    _draw_line_pil(draw, tx, x - 0.05, y, x - 0.05, y + bh,
+                   color="blue", width=1, dashed=True)
+    draw.text(tx(x + 0.4, y + bh * 0.45), "ตัวหน้า", fill="black",
+              font=label_font)
+
+    # flutter sleeve below: straight gathered top, curved falling hem
+    sy = 1.0
+    _draw_line_pil(draw, tx, x, sy + sh, x + sw, sy + sh, color="#c2185b")
+    _draw_line_pil(draw, tx, x, sy + sh, x, sy + sh * 0.35, color="#c2185b")
+    _draw_line_pil(draw, tx, x + sw, sy + sh, x + sw, sy + sh * 0.35,
+                   color="#c2185b")
+    _draw_bezier_pil(draw, tx,
+                     (x, sy + sh * 0.35), (x + sw * 0.2, sy - sh * 0.05),
+                     (x + sw * 0.8, sy - sh * 0.05), (x + sw, sy + sh * 0.35),
+                     color="#c2185b")
+    draw.text(tx(x + 0.4, sy + sh * 0.55),
+              f"แขนระบาย — กว้าง {sw:.0f} ซม. (รูดจีบเหลือ {d['sleeve_cap']:.0f})",
+              fill="#c2185b", font=label_font)
+
+    draw.text((10, 10), "พรีวิวเสื้อคอระบาย", fill="black", font=font)
+    return img
+
+
 def _preview_generic_rect(title, w, h):
     """Fallback for patterns without custom preview: labeled bounding box."""
     img, draw, tx = _setup_canvas(w + 2, h + 2)
@@ -392,6 +444,10 @@ def generate_preview(pattern_key: str, size_label: str,
         img = _preview_bloomers(spec)
     elif pattern_key == "bonnet":
         img = _preview_bonnet(spec)
+    elif pattern_key == "flutter_top":
+        img = _preview_flutter_top(spec, **{
+            k: v for k, v in params.items()
+            if k in ("sleeve_fullness", "neck_finish")})
     elif pattern_key == "kimono_top":
         w = spec["chest"] / 4 + 2.0
         h = spec["length"] * 0.9

@@ -35,6 +35,7 @@ clothingdesign/
 └── patterns/                # วาดแต่ละแพทเทิร์นลง PDF
     ├── dress.py             # เดรสสายไหล่ (ชายระบาย / ชายบอลลูน / สาบกระดุม)
     ├── tiered_dress.py      # เดรสกระโปรงชั้น (คอกลม / halter / สายไหล่)
+    ├── flutter_top.py       # เสื้อคอระบายแขนระบาย (ใส่ใต้เดรส/เอี๊ยม)
     ├── bib.py  bloomers.py  bonnet.py  kimono_top.py
     └── pants.py  tshirt.py  romper.py  sleep_sack.py  flutter_romper.py
 ```
@@ -69,13 +70,14 @@ geometry.pack_pieces(pieces, width)   # shelf packer ที่ทั้งสอ
 
 ---
 
-## Tool ที่มีทั้งหมด (23 ตัว)
+## Tool ที่มีทั้งหมด (24 ตัว)
 
-### Pattern generators (11)
+### Pattern generators (12)
 | Tool | คำอธิบาย | ตัวเลือกพิเศษ |
 |------|----------|---------------|
 | `generate_full_dress_pattern` | เดรสสายไหล่ + ระบาย | `skirt_style` (gathered/bubble), `front_placket` |
 | `generate_tiered_dress_pattern` | เดรสกระโปรงชั้น | `tiers` (2-3), `neckline` (round/halter/strap), `tier_fullness`, `lace_trim` |
+| `generate_flutter_top_pattern` | เสื้อคอระบายแขนระบาย (ใส่ใต้เดรส) | `sleeve_fullness`, `neck_finish` (ruffle/binding) |
 | `generate_bib_pattern` | ผ้ากันเปื้อน keyhole | — |
 | `generate_bloomers_pattern` | กางเกงคลุมผ้าอ้อม | — |
 | `generate_bonnet_pattern` | หมวกคลุมผม 3 ชิ้น | — |
@@ -162,7 +164,6 @@ pytest test_smoke.py -q       # หรือแบบนี้
 - Fabric shrinkage compensation
 - Custom measurements per child
 - แยก `outputs/` ไป branch `gh-pages` (ดูหัวข้อ Auto-publish)
-- เสื้อคอระบายตัวในสำหรับชุดเอี๊ยมทับ (ยังไม่มีแพทเทิร์นรองรับ)
 
 ---
 

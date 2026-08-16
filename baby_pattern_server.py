@@ -45,8 +45,8 @@ import features
 import gallery
 import preview
 import rendered
-from patterns import (dress, tiered_dress, bib, bloomers, bonnet,
-                      kimono_top, pants, tshirt, romper, sleep_sack,
+from patterns import (dress, tiered_dress, flutter_top, bib, bloomers,
+                      bonnet, kimono_top, pants, tshirt, romper, sleep_sack,
                       flutter_romper)
 from sizes import SIZE_CHART
 
@@ -240,6 +240,32 @@ def generate_tiered_dress_pattern(size_label: str,
                         seam_allowance=seam_allowance,
                         tiers=tiers, neckline=neckline,
                         tier_fullness=tier_fullness, lace_trim=lace_trim)
+
+
+@mcp.tool()
+def generate_flutter_top_pattern(size_label: str,
+                                 seam_allowance: float = 1.0,
+                                 sleeve_fullness: float = 1.8,
+                                 neck_finish: str = "ruffle") -> str:
+    """Generate a short pull-on top with flutter sleeves.
+
+    Use for: the white blouse worn UNDER a pinafore or strap dress. Pair it
+    with generate_full_dress_pattern or generate_tiered_dress_pattern to get
+    the layered look. Not a standalone dress.
+
+    sleeve_fullness: how much wider the sleeve is than the armhole it
+                     gathers into (1.8 = normal flutter). Range 1.2-2.5.
+    neck_finish: 'ruffle'  คอระบายตั้งขึ้นรอบคอ
+                 'binding' คอเรียบกุ๊นด้วยแถบผ้าเฉลียง
+    Difficulty: Intermediate. Fabric: white cotton lawn, voile, or eyelet.
+    """
+    return _run_pattern("flutter_top", size_label, flutter_top.generate,
+                        label_extra=neck_finish,
+                        render_params={"sleeve_fullness": sleeve_fullness,
+                                       "neck_finish": neck_finish},
+                        seam_allowance=seam_allowance,
+                        sleeve_fullness=sleeve_fullness,
+                        neck_finish=neck_finish)
 
 
 @mcp.tool()
