@@ -1,3 +1,9 @@
+# Both MCP SDK generations work — baby_pattern_server.py imports FastMCP on
+# 1.x and falls back to MCPServer on 2.x, which renamed the class.
 mcp>=1.0
 reportlab>=4.0
 Pillow>=10.0
+
+# Optional, for running test_smoke.py with pytest.
+# `python test_smoke.py` works without it.
+# pytest>=8.0

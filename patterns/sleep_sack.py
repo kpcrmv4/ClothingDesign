@@ -5,10 +5,12 @@ from reportlab.lib.colors import black, gray, red
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, tile_and_save)
+                     draw_bezier_edge, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
-def generate(size_label: str, seam_allowance: float = 1.0) -> str:
+def generate(size_label: str, seam_allowance: float = 1.0,
+             output_dir: str = ".") -> str:
     spec = get_size(size_label)
 
     chest_half = spec["chest"] / 4 + 6.0
@@ -35,10 +37,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_sack_body(c, bx, by, chest_half, hem_half, total_len,
                         neck_w, neck_drop_back, shoulder,
                         armhole_w, armhole_drop)
-        c.setFont("Tahoma-Bold", 11)
+        c.setFont(THAI_FONT_BOLD, 11)
         c.drawString((bx + 1) * cm, (by + total_len * 0.5) * cm,
                      "1. Back - ตัด 1 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((bx + 1) * cm, (by + total_len * 0.45) * cm,
                      f"Size {size_label}")
         c.drawString((bx + 1) * cm, (by + total_len * 0.4) * cm,
@@ -58,10 +60,10 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         _draw_sack_body(c, fx, fy, chest_half, hem_half, total_len,
                         neck_w, neck_drop_front, shoulder,
                         armhole_w, armhole_drop)
-        c.setFont("Tahoma-Bold", 11)
+        c.setFont(THAI_FONT_BOLD, 11)
         c.drawString((fx + 1) * cm, (fy + total_len * 0.5) * cm,
                      "2. Front - ตัด 2 ชิ้น (left + right)")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((fx + 1) * cm, (fy + total_len * 0.45) * cm,
                      "Center front edge = zipper placement")
 
@@ -73,7 +75,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
                fx * cm, (fy + total_len - neck_drop_front) * cm)
         c.setDash([], 0)
         c.setStrokeColor(black)
-        c.setFont("Tahoma", 6)
+        c.setFont(THAI_FONT, 6)
         c.setFillColor(red)
         c.drawString((fx + 0.3) * cm, (fy + total_len - neck_drop_front - 0.6) * cm,
                      "ZIPPER (do NOT cut on fold)")
@@ -113,7 +115,7 @@ def generate(size_label: str, seam_allowance: float = 1.0) -> str:
         f"ส่วนตะเข็บรวมอยู่แล้ว: {seam_allowance} cm",
     ]
 
-    file_path = os.path.abspath(f"sleep_sack_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"sleep_sack_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(file_path, "ถุงนอน", size_label,
                                  total_w, total_h, draw, instructions)
 

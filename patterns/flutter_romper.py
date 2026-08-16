@@ -9,14 +9,16 @@ from reportlab.lib.colors import black, gray, red, blue
 
 from sizes import get_size
 from drawing import (draw_grain_line, draw_notch, draw_fold_edge,
-                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save)
+                     draw_bezier_edge, draw_sa_rect_envelope, tile_and_save,
+                     THAI_FONT, THAI_FONT_BOLD)
 
 
 def generate(size_label: str,
              seam_allowance: float = 1.0,
              ruffle_height: float = 7.0,
              ruffle_fullness: float = 1.8,
-             crotch_snaps: int = 3) -> str:
+             crotch_snaps: int = 3,
+             output_dir: str = ".") -> str:
     """
     Pieces produced:
       1. Body  — cut 2 on fold (front + back, identical)
@@ -68,14 +70,14 @@ def generate(size_label: str,
                            crotch_half, shoulder_drop, leg_drop, rise,
                            body_torso, total_h, sa)
 
-        c.setFont("Tahoma-Bold", 11)
+        c.setFont(THAI_FONT_BOLD, 11)
         c.drawString((bx + 1) * cm, (by + total_h * 0.6) * cm,
                      "1. Body - ตัด 2 ชิ้นบนรอยพับ")
-        c.setFont("Tahoma", 8)
+        c.setFont(THAI_FONT, 8)
         c.drawString((bx + 1) * cm, (by + total_h * 0.55) * cm,
                      f"Size {size_label}  |  "
                      f"Front + Back (identical)")
-        c.setFont("Tahoma", 7)
+        c.setFont(THAI_FONT, 7)
         c.drawString((bx + 1) * cm, (by + total_h * 0.50) * cm,
                      f"Top {top_half * 2:.1f}cm | Hip {hip_half * 2:.1f}cm "
                      f"| Length {total_h:.1f}cm")
@@ -103,14 +105,14 @@ def generate(size_label: str,
             snap_x = bx + 1 + i * snap_spacing
             c.circle(snap_x * cm, snap_y * cm, 0.2 * cm, fill=1, stroke=0)
         c.setFillColor(black)
-        c.setFont("Tahoma", 6)
+        c.setFont(THAI_FONT, 6)
         c.setFillColor(red)
         c.drawString((bx + 0.3) * cm, (by + 1.1) * cm,
                      f"{crotch_snaps} snaps at crotch (back piece only)")
         c.setFillColor(black)
 
         # elastic casing annotation at top
-        c.setFont("Tahoma", 6)
+        c.setFont(THAI_FONT, 6)
         c.setFillColor(gray)
         c.drawString((bx + 0.3) * cm, (by + total_h - 0.35) * cm,
                      "fold 1.5cm for elastic casing")
@@ -129,14 +131,14 @@ def generate(size_label: str,
             c.rect(rx * cm, ry * cm,
                    ruffle_length_each * cm, ruffle_h * cm)
 
-            c.setFont("Tahoma-Bold", 10)
+            c.setFont(THAI_FONT_BOLD, 10)
             if ruffle_strips == 1:
                 label = "2. Ruffle - ตัด 1 ชิ้น strip"
             else:
                 label = f"2. Ruffle - Strip {strip_i + 1} of 2 (cut 1 each)"
             c.drawString((rx + 0.5) * cm,
                          (ry + ruffle_h - 0.7) * cm, label)
-            c.setFont("Tahoma", 7)
+            c.setFont(THAI_FONT, 7)
             c.drawString((rx + 0.5) * cm, (ry + ruffle_h - 1.3) * cm,
                          f"{ruffle_length_each:.1f} x {ruffle_h:.1f} cm  "
                          f"(gather top, fullness {ruffle_fullness}x)")
@@ -201,7 +203,7 @@ def generate(size_label: str,
         f"Ruffle height: {ruffle_height} cm  |  Fullness: {ruffle_fullness}x",
     ]
 
-    file_path = os.path.abspath(f"flutter_romper_pattern_{size_label}.pdf")
+    file_path = os.path.abspath(os.path.join(output_dir, f"flutter_romper_pattern_{size_label}.pdf"))
     total_pages = tile_and_save(
         file_path, "ชุดหมีคอระบาย", size_label,
         total_w, total_h_canvas, draw, instructions)

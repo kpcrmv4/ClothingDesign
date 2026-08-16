@@ -6,8 +6,10 @@ for quick visual check before generating full PDF.
 """
 import os
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
+import geometry
+from fonts import pil_font
 from sizes import get_size
 
 
@@ -77,10 +79,7 @@ def _draw_line_pil(draw, tx, x1, y1, x2, y2, color="black", width=2, dashed=Fals
 
 
 def _get_font(size=14):
-    try:
-        return ImageFont.truetype("DejaVuSans.ttf", size)
-    except Exception:
-        return ImageFont.load_default()
+    return pil_font(size)
 
 
 # ============================================================
@@ -286,6 +285,130 @@ def _preview_flutter_romper(spec):
     return img
 
 
+def _preview_tiered_dress(spec, tiers=3, neckline="round",
+                          tier_fullness=1.5, **_ignored):
+    """Bodice outline plus a stacked sketch of each skirt tier."""
+    d = geometry.tiered_dress_dims(spec, tiers=tiers, neckline=neckline,
+                                   tier_fullness=tier_fullness)
+    bw, bh = d["bodice_w"], d["bodice_h"]
+    widest = max(d["tier_widths"]) / 2   # tiers drawn at half width, to scale
+
+    total_w = max(bw, widest) + 2
+    total_h = bh + d["skirt_total_h"] + 2
+    img, draw, tx = _setup_canvas(total_w, total_h)
+    font = _get_font(14)
+    label_font = _get_font(10)
+
+    x = 1.0
+    y = 1.0 + d["skirt_total_h"]        # bodice sits above the tiers
+
+    # --- bodice half piece, left edge = fold ---
+    _draw_line_pil(draw, tx, x, y, x + bw, y)                 # hem
+    if neckline == "halter":
+        top_half = d["band_w"] / 2
+        _draw_line_pil(draw, tx, x, y + bh, x + top_half, y + bh)
+        _draw_bezier_pil(draw, tx,
+                         (x + top_half, y + bh),
+                         (x + top_half + 1.0, y + bh - 2.0),
+                         (x + bw - 0.5, y + bh - d["armhole_drop"] * 0.5),
+                         (x + bw, y + bh - d["armhole_drop"]))
+    else:
+        nw = d["neck_width"]
+        sw = d["shoulder_w"] if neckline == "round" else d["strap_w"] * 0.9
+        tip = min(x + nw + sw, x + bw - 0.5)
+        _draw_line_pil(draw, tx, x + nw, y + bh, tip, y + bh)
+        _draw_bezier_pil(draw, tx,
+                         (x, y + bh - d["neck_drop"]),
+                         (x + nw * 0.3, y + bh - d["neck_drop"]),
+                         (x + nw, y + bh - d["neck_drop"] * 0.3),
+                         (x + nw, y + bh))
+        _draw_bezier_pil(draw, tx,
+                         (tip, y + bh),
+                         (tip + (x + bw - tip) * 0.2,
+                          y + bh - d["armhole_drop"] * 0.4),
+                         (x + bw - d["armhole_width"] * 0.5,
+                          y + bh - d["armhole_drop"] * 0.7),
+                         (x + bw, y + bh - d["armhole_drop"]))
+    _draw_line_pil(draw, tx, x + bw, y + bh - d["armhole_drop"], x + bw, y)
+    _draw_line_pil(draw, tx, x - 0.05, y, x - 0.05, y + bh,
+                   color="blue", width=1, dashed=True)
+    draw.text(tx(x + 0.4, y + bh * 0.45), "ตัวเสื้อ", fill="black",
+              font=label_font)
+
+    # --- tiers stacked below, each drawn at its own (half) width ---
+    ty = y
+    for i, full_w in enumerate(d["tier_widths"], start=1):
+        half = full_w / 2
+        th = d["tier_h"]
+        ty -= th
+        _draw_line_pil(draw, tx, x, ty, x + half, ty, color="#7a4fbf")
+        _draw_line_pil(draw, tx, x + half, ty, x + half, ty + th,
+                       color="#7a4fbf")
+        _draw_line_pil(draw, tx, x, ty + th, x + half, ty + th,
+                       color="#7a4fbf")
+        _draw_line_pil(draw, tx, x - 0.05, ty, x - 0.05, ty + th,
+                       color="blue", width=1, dashed=True)
+        draw.text(tx(x + 0.4, ty + th * 0.4),
+                  f"ชั้น {i} — กว้าง {full_w:.0f} ซม.",
+                  fill="#7a4fbf", font=label_font)
+
+    draw.text((10, 10), f"พรีวิวเดรสกระโปรงชั้น ({tiers} ชั้น)",
+              fill="black", font=font)
+    return img
+
+
+def _preview_flutter_top(spec, **params):
+    """Front body outline with the flutter sleeve strip sketched beside it."""
+    d = geometry.flutter_top_dims(spec, **params)
+    bw, bh = d["chest_half"], d["length"]
+    sw, sh = d["sleeve_w"], d["sleeve_h"]
+
+    total_w = max(bw, sw) + 2
+    total_h = bh + sh + 3
+    img, draw, tx = _setup_canvas(total_w, total_h)
+    font = _get_font(14)
+    label_font = _get_font(10)
+
+    x, y = 1.0, 1.0 + sh + 1.0
+    nw, nd = d["neck_width"], d["neck_drop_front"]
+    tip = min(x + nw + d["shoulder_w"], x + bw - 0.5)
+
+    _draw_line_pil(draw, tx, x, y, x + bw, y)                     # hem
+    _draw_line_pil(draw, tx, x + nw, y + bh, tip, y + bh)         # shoulder
+    _draw_bezier_pil(draw, tx,
+                     (x, y + bh - nd), (x + nw * 0.35, y + bh - nd),
+                     (x + nw, y + bh - nd * 0.3), (x + nw, y + bh))
+    _draw_bezier_pil(draw, tx,
+                     (tip, y + bh),
+                     (tip + (x + bw - tip) * 0.25,
+                      y + bh - d["armhole_drop"] * 0.35),
+                     (x + bw - d["armhole_width"] * 0.5,
+                      y + bh - d["armhole_drop"] * 0.7),
+                     (x + bw, y + bh - d["armhole_drop"]))
+    _draw_line_pil(draw, tx, x + bw, y + bh - d["armhole_drop"], x + bw, y)
+    _draw_line_pil(draw, tx, x - 0.05, y, x - 0.05, y + bh,
+                   color="blue", width=1, dashed=True)
+    draw.text(tx(x + 0.4, y + bh * 0.45), "ตัวหน้า", fill="black",
+              font=label_font)
+
+    # flutter sleeve below: straight gathered top, curved falling hem
+    sy = 1.0
+    _draw_line_pil(draw, tx, x, sy + sh, x + sw, sy + sh, color="#c2185b")
+    _draw_line_pil(draw, tx, x, sy + sh, x, sy + sh * 0.35, color="#c2185b")
+    _draw_line_pil(draw, tx, x + sw, sy + sh, x + sw, sy + sh * 0.35,
+                   color="#c2185b")
+    _draw_bezier_pil(draw, tx,
+                     (x, sy + sh * 0.35), (x + sw * 0.2, sy - sh * 0.05),
+                     (x + sw * 0.8, sy - sh * 0.05), (x + sw, sy + sh * 0.35),
+                     color="#c2185b")
+    draw.text(tx(x + 0.4, sy + sh * 0.55),
+              f"แขนระบาย — กว้าง {sw:.0f} ซม. (รูดจีบเหลือ {d['sleeve_cap']:.0f})",
+              fill="#c2185b", font=label_font)
+
+    draw.text((10, 10), "พรีวิวเสื้อคอระบาย", fill="black", font=font)
+    return img
+
+
 def _preview_generic_rect(title, w, h):
     """Fallback for patterns without custom preview: labeled bounding box."""
     img, draw, tx = _setup_canvas(w + 2, h + 2)
@@ -307,10 +430,13 @@ def _preview_generic_rect(title, w, h):
 # ============================================================
 # ENTRY POINT
 # ============================================================
-def generate_preview(pattern_key: str, size_label: str) -> str:
+def generate_preview(pattern_key: str, size_label: str,
+                     output_dir: str = ".", **params) -> str:
     spec = get_size(size_label)
 
-    if pattern_key == "dress":
+    if pattern_key == "tiered_dress":
+        img = _preview_tiered_dress(spec, **params)
+    elif pattern_key == "dress":
         img = _preview_dress(spec)
     elif pattern_key == "bib":
         img = _preview_bib(spec)
@@ -318,6 +444,10 @@ def generate_preview(pattern_key: str, size_label: str) -> str:
         img = _preview_bloomers(spec)
     elif pattern_key == "bonnet":
         img = _preview_bonnet(spec)
+    elif pattern_key == "flutter_top":
+        img = _preview_flutter_top(spec, **{
+            k: v for k, v in params.items()
+            if k in ("sleeve_fullness", "neck_finish")})
     elif pattern_key == "kimono_top":
         w = spec["chest"] / 4 + 2.0
         h = spec["length"] * 0.9
@@ -343,6 +473,7 @@ def generate_preview(pattern_key: str, size_label: str) -> str:
     else:
         return f"Error: unknown pattern '{pattern_key}'"
 
-    file_path = os.path.abspath(f"preview_{pattern_key}_{size_label}.png")
+    file_path = os.path.abspath(
+        os.path.join(output_dir, f"preview_{pattern_key}_{size_label}.png"))
     img.save(file_path, "PNG")
     return file_path
